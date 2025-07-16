@@ -7,6 +7,5 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./app:/app
       - ./cv_documents:/app/cv_documents
       - ./cv_vectorstore:/app/cv_vectorstore
