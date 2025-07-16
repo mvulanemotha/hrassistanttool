@@ -12,7 +12,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-@app.post("/upload_cv_embed")
+@app.post("/hrassistantai/upload_cv_embed")
 #call function to upload files
 async def upload_cv_embed(files: list[UploadFile] = File(...)):
     """
@@ -41,7 +41,7 @@ async def upload_cv_embed(files: list[UploadFile] = File(...)):
         "saved_files": saved
     }
 
-@app.get("/compare_job_description")
+@app.get("/hrassistantai/compare_job_description")
 #call function to compare job description with stored CVs
 def compare_job_description_endpoint(job_description: str):
     """
