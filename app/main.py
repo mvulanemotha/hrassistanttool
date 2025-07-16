@@ -3,8 +3,8 @@ import os
 from typing import List , Dict, Any
 from fastapi.responses import JSONResponse
 
-from embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
-from compare_cvs import compare_with_job_description # importing the function
+from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
+from app.compare_cvs import compare_with_job_description # importing the function
 
 app = FastAPI(
     title="HR AI Assistant API",
