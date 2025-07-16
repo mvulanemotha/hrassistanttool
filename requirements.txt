@@ -1,0 +1,14 @@
+langchain
+langchain-community
+faiss-cpu
+transformers
+torch
+unstructured
+docx2txt
+pypdf
+sentence-transformers
+fpdf
+streamlit
+fastapi
+uvicorn
+python-multipart

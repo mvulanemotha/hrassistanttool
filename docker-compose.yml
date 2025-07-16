@@ -1,0 +1,12 @@
+version: '3.9'
+
+services:
+  backend:
+    build: .
+    container_name: hr_ai_assistant_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app
+      - ./cv_documents:/app/cv_documents
+      - ./cv_vectorstore:/app/cv_vectorstore
