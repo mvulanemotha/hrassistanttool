@@ -1,16 +1,75 @@
-from fastapi import FastAPI , UploadFile, File , Query
+from fastapi import FastAPI , UploadFile, File , Query , Depends ,HTTPException
 import os
 from typing import List , Dict, Any
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel , EmailStr
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_cvs import compare_with_job_description # importing the function
+from app.database.database import SessionLocal
+from app.models.user_model import User , UserLogin , UserCreate
+from app.utils.auth import create_access_token
+
 
 app = FastAPI(
     title="HR AI Assistant API",
     description="Upload CVs, embed them, and compare against job description",
     version="1.0.0"
 )
+
+#password hashing
+pwd_context = CryptContext(schemes=["bcrypt"] , deprecated="auto")
+
+#Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()    
+
+
+# create a login end point
+@app.post("/hrassistantai/login" , status_code=200)
+def login(user: UserLogin, db:Session = Depends(get_db)):   
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if not db_user:
+        raise HTTPException(status_code=400 , detail="User not found")
+
+    # verify password
+    if not pwd_context.verify(user.password , db_user.password):
+        raise HTTPException(status_code=400 , detail="Invalid email or password")
+
+    # create jwt token
+    access_token = create_access_token(data={"sub": db_user.email})
+    return { "access_token" : access_token } 
+
+# create a new user
+@app.post("/hrassistantai/newuser/" , status_code=201)
+def create_user(user:UserCreate , db:Session= Depends(get_db)):
+    """ 
+    create a new user
+    """
+    # check if user exists
+    existing_user = db.query(User).filter(User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Hash the password
+    hashed_password = pwd_context.hash(user.password)
+
+    #Create new user object
+    db_user = User(email=user.email, password=hashed_password , name=user.name)
+
+    # Add to DB and commit
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+ 
+    return { "id":db_user.id , "email": db_user.email , "name": db_user.name }
+
 
 @app.post("/hrassistantai/upload_cv_embed")
 #call function to upload files

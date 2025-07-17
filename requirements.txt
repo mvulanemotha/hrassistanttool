@@ -12,3 +12,8 @@ streamlit
 fastapi
 uvicorn
 python-multipart
+passlib[bcrypt]
+sqlalchemy
+python-jose[cryptography]
+python-dotenv
+pydantic[email]
