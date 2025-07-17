@@ -44,7 +44,7 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
 
     # create jwt token
     access_token = create_access_token(data={"sub": db_user.email})
-    return { "access_token" : access_token } 
+    return { "access_token" : access_token , "status_code" : 200 } 
 
 # create a new user
 @app.post("/hrassistantai/newuser/" , status_code=201)
