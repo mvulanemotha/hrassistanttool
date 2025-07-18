@@ -79,7 +79,7 @@ def create_user(user:UserCreate , db:Session= Depends(get_db)):
     db.commit()
     db.refresh(db_user)
  
-    return { "id":db_user.id , "email": db_user.email , "name": db_user.name }
+    return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 }
 
 
 @app.post("/hrassistantai/upload_cv_embed")
