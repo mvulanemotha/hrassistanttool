@@ -58,7 +58,7 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
     return { "access_token" : access_token , "status_code" : 200 } 
 
 # create a new user
-@app.post("/hrassistantai/newuser/" , status_code=201)
+@app.post("/hrassistantai/newuser")
 def create_user(user:UserCreate , db:Session= Depends(get_db)):
     """ 
     create a new user
