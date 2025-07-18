@@ -1,4 +1,5 @@
 from fastapi import FastAPI , UploadFile, File , Query , Depends ,HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import os
 from typing import List , Dict, Any
 from fastapi.responses import JSONResponse
@@ -18,6 +19,14 @@ app = FastAPI(
     description="Upload CVs, embed them, and compare against job description",
     version="1.0.0"
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],       # ✅ allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],       # ✅ allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],       # ✅ allow all headers
+) 
 
 #password hashing
 pwd_context = CryptContext(schemes=["bcrypt"] , deprecated="auto")
