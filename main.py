@@ -45,11 +45,13 @@ def get_db():
 def login(user: UserLogin, db:Session = Depends(get_db)):   
     db_user = db.query(User).filter(User.email == user.email).first()
     if not db_user:
-        raise HTTPException(status_code=400 , detail="User not found")
+        #raise HTTPException(status_code=400 , detail="User not found")
+        return { "status_code" : 400 , "message" : "User not found" }
 
     # verify password
     if not pwd_context.verify(user.password , db_user.password):
-        raise HTTPException(status_code=400 , detail="Invalid email or password")
+        #raise HTTPException(status_code=400 , detail="Invalid email or password")
+        return { "status_code" : 400 , "message" : "User not found" }
 
     # create jwt token
     access_token = create_access_token(data={"sub": db_user.email})
@@ -64,8 +66,8 @@ def create_user(user:UserCreate , db:Session= Depends(get_db)):
     # check if user exists
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
+        #raise HTTPException(status_code=400, detail="Email already registered")
+        return { "status_code" : 400 , "message" : "Email already registered" }
     # Hash the password
     hashed_password = pwd_context.hash(user.password)
 
