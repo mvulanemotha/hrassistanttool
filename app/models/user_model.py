@@ -15,6 +15,9 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     password = Column(String)  # hashed password
     name = Column(String)
+   
+    def __repr__(self):
+        return f"<User(id={self.id}, email={self.email}, name={self.name})>"
 
     # optional: relationship to match history
     match_history = relationship("MatchHistory", back_populates="user")

@@ -6,11 +6,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel , EmailStr
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import User , UserLogin , UserCreate
+from app.models.user_model import User , UserLogin , UserCreate , MatchHistory , MatchResult , MatchHistorySchema ,MatchResultSchema
 from app.utils.auth import create_access_token
 
 
@@ -43,7 +44,9 @@ def get_db():
 # create a login end point
 @app.post("/hrassistantai/login" , status_code=200)
 def login(user: UserLogin, db:Session = Depends(get_db)):   
+    print("🚀 Login endpoint CALLED!", flush=True)
     db_user = db.query(User).filter(User.email == user.email).first()
+    print(f"User Details: {db_user}", flush=True)
     if not db_user:
         #raise HTTPException(status_code=400 , detail="User not found")
         return { "status_code" : 400 , "message" : "User not found" }
@@ -52,10 +55,10 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
     if not pwd_context.verify(user.password , db_user.password):
         #raise HTTPException(status_code=400 , detail="Invalid email or password")
         return { "status_code" : 400 , "message" : "User not found" }
-
+  
     # create jwt token
     access_token = create_access_token(data={"sub": db_user.email})
-    return { "access_token" : access_token , "status_code" : 200 } 
+    return { "access_token" : access_token , "status_code" : 200 , "user_id": db_user.id } 
 
 # create a new user
 @app.post("/hrassistantai/newuser")
@@ -132,4 +135,34 @@ def compare_job_description_endpoint(job_description: str):
         })
 
     return JSONResponse(content={"matches" : output})
+
+
+@app.post("/hrassistantai/save_matches")
+def save_matches_history(user_id:int , job_description: str , matches: List , db: Session = Depends(get_db)):
+    history = MatchHistory(user_id=user_id , job_description=job_description , created_at=datetime.utcnow())
+    db.add(history)
+    db.commit()
+    db.refresh(history)
+
+    for m in matches:
+        result = MatchResult(
+            history_id = history.id,
+            file_name=m["file_name"],
+            score=m["score"],
+            matched_content=m.get("Matched_content","")
+        )
+        db.add(result)
+    db.commit()
+
+    return { "status": "ok", "history_id": history.id }
  
+
+@app.get("/hrassistantai/match_history/{user_id}" , response_model=List[MatchHistorySchema])
+def get_match_history(user_id:int , db:Session = Depends(get_db)):
+    history_records = (
+        db.query(MatchHistory).
+        filter(MatchHistory.user_id == user_id)
+        .all()
+    )
+
+    return history_records
