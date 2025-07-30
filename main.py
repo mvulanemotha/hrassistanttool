@@ -2,7 +2,7 @@ from fastapi import FastAPI , UploadFile, File , Query , Depends ,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from typing import List , Dict, Any
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse , StreamingResponse
 from pydantic import BaseModel , EmailStr
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -11,9 +11,15 @@ from datetime import datetime
 from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import User , UserLogin , UserCreate , MatchHistory , MatchResult , MatchHistorySchema ,MatchResultSchema
+from app.models.user_model import User , UserCVUpload ,UserCVSchema, UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.utils.auth import create_access_token
+from collections import defaultdict
+import zipfile
+from io import BytesIO
+from pathlib import Path
 
+
+CV_STORAGE_DIR = Path("cv_documents")
 
 app = FastAPI(
     title="HR AI Assistant API",
@@ -62,7 +68,7 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
 
 # create a new user
 @app.post("/hrassistantai/newuser")
-def create_user(user:UserCreate , db:Session= Depends(get_db)):
+def create_user(user:UserCreate , db:Session = Depends(get_db)):
     """ 
     create a new user
     """
@@ -87,10 +93,12 @@ def create_user(user:UserCreate , db:Session= Depends(get_db)):
 
 @app.post("/hrassistantai/upload_cv_embed")
 #call function to upload files
-async def upload_cv_embed(files: list[UploadFile] = File(...)):
+async def upload_cv_embed(files: list[UploadFile] = File(...) , user_id:str = File(...) , job_title:str = File(...) , db: Session = Depends(get_db)):
     """
     Upload CV files and create a vector store for comparison.
     """
+    print(files)
+
     # Create upload folder if it doesn't exist
     os.makedirs(INPUT_FOLDER, exist_ok=True)
 
@@ -101,6 +109,15 @@ async def upload_cv_embed(files: list[UploadFile] = File(...)):
         with open(path, "wb") as f:
             f.write(await file.read())
         saved.append(file.filename)
+
+        cv_record = UserCVUpload(
+            user_id = user_id,
+            job_title = job_title,
+            file_name = file.filename
+        )
+        db.add(cv_record)
+
+    db.commit()
 
     #print the saved files
     print(f"Files saved: {', '.join(saved)}") 
@@ -137,32 +154,90 @@ def compare_job_description_endpoint(job_description: str):
     return JSONResponse(content={"matches" : output})
 
 
-@app.post("/hrassistantai/save_matches")
-def save_matches_history(user_id:int , job_description: str , matches: List , db: Session = Depends(get_db)):
-    history = MatchHistory(user_id=user_id , job_description=job_description , created_at=datetime.utcnow())
+@app.post("/hrassistantai/save_matches" , response_model=MatchHistorySchema)
+def save_matches_history(payload:SaveMatchesRequest, db: Session = Depends(get_db)):
+    print(payload.dict())
+    history = MatchHistory(user_id=payload.user_id , job_description=payload.jobDescription, job_title=payload.job_title, created_at=datetime.utcnow())
     db.add(history)
     db.commit()
     db.refresh(history)
 
-    for m in matches:
+    for m in payload.matchedCandidates:
         result = MatchResult(
-            history_id = history.id,
-            file_name=m["file_name"],
-            score=m["score"],
-            matched_content=m.get("Matched_content","")
+            history_id=history.id,
+            file_name=m.file_name,
+            score=m.score,
+            matched_content=m.matched_content or ""
         )
         db.add(result)
     db.commit()
 
-    return { "status": "ok", "history_id": history.id }
+    return history
  
 
-@app.get("/hrassistantai/match_history/{user_id}" , response_model=List[MatchHistorySchema])
+@app.get("/hrassistantai/match_history")
 def get_match_history(user_id:int , db:Session = Depends(get_db)):
+    #return db.query(MatchHistory).all()
     history_records = (
         db.query(MatchHistory).
         filter(MatchHistory.user_id == user_id)
         .all()
     )
 
-    return history_records
+    #return history_records
+    return [MatchHistorySchema.from_orm(history) for history in history_records] 
+
+
+@app.get("/hrassistantai/user_cvs/")
+def get_user_cvs(user_id:int ,db: Session = Depends(get_db)):
+    user_cvs = db.query(UserCVUpload).filter(UserCVUpload.user_id == user_id).all()
+
+    #group by job_title
+    grouped: Dict[str , List[dict]] = defaultdict(list)
+
+    for cv in user_cvs:
+        cv_data = UserCVSchema.model_validate(cv).dict()
+        cv_data["created_at"] = cv_data["created_at"].strftime("%Y-%m-%d %H:%M:%S") # Serialize datetime
+        grouped[cv.job_title].append(cv_data)
+
+    return JSONResponse(content=grouped)
+
+#download matched documents
+@app.get("/hrassistantai/download_matches")
+def getMatched_cvs(match_id:int , db: Session = Depends(get_db)):
+    #fetch match history and its results
+    history = db.query(MatchHistory).filter(MatchHistory.id == match_id).first()
+
+    if not history:
+        return { "status_code": 400 , "message": "No job matches were found" }
+    
+    results = db.query(MatchResult).filter(MatchResult.history_id == match_id).all()
+    
+    if not results:
+        return { "status_code": 400 , "message": "No matches were found" }
+
+    # create ZIP stream
+    zip_stream = BytesIO()
+    with zipfile.ZipFile(zip_stream , mode="w" , compression=zipfile.ZIP_DEFLATED) as zipf:
+        for result in results:
+            file_path = CV_STORAGE_DIR / result.file_name
+            if file_path.exists():
+                # get original file extension
+                ext = Path(result.file_name).suffix
+
+                #build new name
+                base_name = Path(result.file_name).stem # removes extension
+                score_str = f"{result.score:.1f}".replace('.','.') # Optional: formart score
+                new_file_name = f"{base_name}_score_{score_str}%{ext}"
+
+                zipf.write(file_path, arcname=new_file_name)
+
+    zip_stream.seek(0)
+
+
+    return StreamingResponse(
+        zip_stream,
+        media_type="application/zip",
+        headers={"Content-Disposition" : f"attachment; filename=matches_{history.job_title.replace(' ', ' ')}.zip"}
+    )
+    

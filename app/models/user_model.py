@@ -15,12 +15,15 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     password = Column(String)  # hashed password
     name = Column(String)
+
+    created_at = Column(DateTime , default=datetime.utcnow)
    
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, name={self.name})>"
 
     # optional: relationship to match history
     match_history = relationship("MatchHistory", back_populates="user")
+    uploaded_cvs = relationship("UserCVUpload", back_populates="user", cascade="all, delete-orphan")
 
 
 class MatchHistory(Base):
@@ -28,7 +31,10 @@ class MatchHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     job_description = Column(Text, nullable=False)
+    job_title = Column(String, nullable=False)  # ✅ Add this line
+
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
     # relationships
     user = relationship("User", back_populates="match_history")
@@ -43,8 +49,24 @@ class MatchResult(Base):
     score = Column(Float, nullable=False)
     matched_content = Column(Text)
 
+    created_at = Column(DateTime , default=datetime.utcnow)
+    updated_at = Column(DateTime , default=datetime.utcnow)
+
     history = relationship("MatchHistory", back_populates="results")
 
+class UserCVUpload(Base):
+    __tablename__ = "user_cvs"
+
+    id = Column(Integer , primary_key=True , index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete = "CASCADE"))
+    file_name = Column(String, nullable=False)
+    job_title = Column(String , nullable=False)
+
+    created_at = Column(DateTime , default=datetime.utcnow)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    #optional: relationship to User
+    user = relationship("User", back_populates="uploaded_cvs")
 
 # =============================
 # ✅ Pydantic SCHEMAS
@@ -71,13 +93,34 @@ class MatchResultSchema(BaseModel):
     matched_content: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class MatchHistorySchema(BaseModel):
     id: int
+    user_id: int
     job_description: str
+    job_title: str  # ✅ Add this line
     created_at: datetime
     results: List[MatchResultSchema] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+
+class SaveMatchesRequest(BaseModel):
+    user_id: int
+    jobDescription: str # match frontend key
+    job_title: str  # ✅ Add this line
+    matchedCandidates: List[MatchResultSchema]
+
+class UserCVSchema(BaseModel):
+
+    id : int
+    user_id : int
+    job_title : str
+    file_name : str
+    created_at : datetime
+
+    model_config = {
+        "from_attributes": True
+    }
