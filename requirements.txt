@@ -17,3 +17,9 @@ sqlalchemy
 python-jose[cryptography]
 python-dotenv
 pydantic[email]
+scikit-learn
+pdfplumber 
+python-docx
+extract-msg~=0.29.0
+fitz
+pymupdf

@@ -1,4 +1,4 @@
-from fastapi import FastAPI , UploadFile, File , Query , Depends ,HTTPException
+from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from typing import List , Dict, Any
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
+from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
 from app.models.user_model import User , UserCVUpload ,UserCVSchema, UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
@@ -24,7 +25,7 @@ CV_STORAGE_DIR = Path("cv_documents")
 app = FastAPI(
     title="HR AI Assistant API",
     description="Upload CVs, embed them, and compare against job description",
-    version="1.0.0"
+    version="1.0.1"
 )
 
 app.add_middleware(
@@ -240,4 +241,13 @@ def getMatched_cvs(match_id:int , db: Session = Depends(get_db)):
         media_type="application/zip",
         headers={"Content-Disposition" : f"attachment; filename=matches_{history.job_title.replace(' ', ' ')}.zip"}
     )
+
+# compare text cv and job_description
+@app.get("/hrassistantai/compare_text_cv_job_description")
+def compare_cv_job_description_text(payload:CompareRequest):
+    return compare_texts(payload)
     
+# compare document cv and document advert
+@app.post("/hrassistantai/compare_cv_advert_documents")
+async def compare_advert_cv(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...)):
+    return await compare_documents(job_description_file , cv_file) 
