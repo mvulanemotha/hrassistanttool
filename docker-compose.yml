@@ -16,11 +16,11 @@ services:
       - ./cv_documents:/app/cv_documents
       - ./cv_vectorstore:/app/cv_vectorstore
     depends_on:
-      - db
+      - dbb
     networks:
       - hr_ai_assistant
 
-  db:
+  dbb:
     image: postgres:15
     container_name: hrassistant-db
     restart: always
