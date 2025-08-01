@@ -1,10 +1,14 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker , declarative_base
+from dotenv import load_dotenv
+import os
 
 #SQLite database will be stored in a local file named app.db
 #SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
 
-SQLALCHEMY_DATABASE_URL = "postgresql://Mkhululi:Mvulane9876543210@158.220.117.250:5432/hraiassistant"
+DATABASE_URL = os.getenv()
+
+SQLALCHEMY_DATABASE_URL = DATABASE_URL
 
 # for sqlite , connect_args is needed to allow multi-thread access
 engine = create_engine(
