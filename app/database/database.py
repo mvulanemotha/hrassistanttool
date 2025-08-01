@@ -6,7 +6,7 @@ import os
 #SQLite database will be stored in a local file named app.db
 #SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
 
-DATABASE_URL = os.getenv()
+DATABASE_URL = os.getenv("DATABASE_UR")
 
 SQLALCHEMY_DATABASE_URL = DATABASE_URL
 
