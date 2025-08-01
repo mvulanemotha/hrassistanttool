@@ -82,6 +82,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str
+    user: str
 
 # ------------------------------
 # Match history/result schemas

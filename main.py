@@ -65,7 +65,7 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
   
     # create jwt token
     access_token = create_access_token(data={"sub": db_user.email})
-    return { "access_token" : access_token , "status_code" : 200 , "user_id": db_user.id } 
+    return { "access_token" : access_token , "status_code" : 200 , "user_id": db_user.id , "user": db_user.user } 
 
 # create a new user
 @app.post("/hrassistantai/newuser")
@@ -82,14 +82,14 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
     hashed_password = pwd_context.hash(user.password)
 
     #Create new user object
-    db_user = User(email=user.email, password=hashed_password , name=user.name)
+    db_user = User(email=user.email, password=hashed_password , name=user.name , user=user.user )
 
     # Add to DB and commit
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
  
-    return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 }
+    return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 , "user":db_user.user }
 
 
 @app.post("/hrassistantai/upload_cv_embed")
