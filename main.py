@@ -1,4 +1,4 @@
-from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException
+from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from typing import List , Dict, Any
@@ -244,7 +244,12 @@ def getMatched_cvs(match_id:int , db: Session = Depends(get_db)):
 
 # compare text cv and job_description
 @app.get("/hrassistantai/compare_text_cv_job_description")
-def compare_cv_job_description_text(payload:CompareRequest):
+def compare_cv_job_description_text(
+    job_description: str = Query(...),
+    cv_text: str = Query(...)
+):
+    # You can still reuse your CompareRequest model internally if you want
+    payload = CompareRequest(job_description=job_description, cv_text=cv_text)
     return compare_texts(payload)
     
 # compare document cv and document advert

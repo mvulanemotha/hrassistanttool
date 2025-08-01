@@ -15,7 +15,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     password = Column(String)  # hashed password
     name = Column(String)
-
+    user = Column(String , nullable=False)
     created_at = Column(DateTime , default=datetime.utcnow)
    
     def __repr__(self):
