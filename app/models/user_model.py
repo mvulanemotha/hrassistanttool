@@ -24,6 +24,20 @@ class User(Base):
     # optional: relationship to match history
     match_history = relationship("MatchHistory", back_populates="user")
     uploaded_cvs = relationship("UserCVUpload", back_populates="user", cascade="all, delete-orphan")
+    credits = relationship("Credits", back_populates="user", cascade="all, delete-orphan")
+
+class Credits(Base):
+    __tablename__ = "credits"
+
+    id = Column(Integer , primary_key=True , index=True)
+    user_id = Column(Integer , ForeignKey("users.id") , nullable=False)
+    amount = Column(Float , nullable=False)
+    created_at = Column(DateTime , default=datetime.utcnow)
+
+    #relationship to user
+    user = relationship("User" , back_populates="credits")
+
+
 
 
 class MatchHistory(Base):
@@ -39,6 +53,7 @@ class MatchHistory(Base):
     # relationships
     user = relationship("User", back_populates="match_history")
     results = relationship("MatchResult", back_populates="history", cascade="all, delete-orphan")
+
 
 
 class MatchResult(Base):
@@ -125,3 +140,18 @@ class UserCVSchema(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+
+class CreditSchema(BaseModel):
+    id:int
+    user_id:int
+    amount: float
+    created_at: datetime
+
+    class Config:
+        form_attributes = True
+
+
+class AddCreditRequest(BaseModel):
+    user_id:int
+    amount: int

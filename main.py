@@ -12,7 +12,7 @@ from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import User , UserCVUpload ,UserCVSchema, UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.utils.auth import create_access_token
 from collections import defaultdict
 import zipfile
@@ -65,7 +65,7 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
   
     # create jwt token
     access_token = create_access_token(data={"sub": db_user.email})
-    return { "access_token" : access_token , "status_code" : 200 , "user_id": db_user.id , "user": db_user.user } 
+    return { "access_token" : access_token , "status_code" : 200 , "user_id": db_user.id , "user": db_user.user , "name" : db_user.name } 
 
 # create a new user
 @app.post("/hrassistantai/newuser")
@@ -88,8 +88,18 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    #assign credits to new user user
+    initial_credits = Credits(
+        user_id=db_user.id,
+        amount=5,
+        created_at=datetime.utcnow()
+    )
+
+    db.add(initial_credits)
+    db.commit()
  
-    return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 , "user":db_user.user }
+    return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 , "user":db_user.user , "credits": initial_credits.amount }
 
 
 @app.post("/hrassistantai/upload_cv_embed")
@@ -256,3 +266,25 @@ def compare_cv_job_description_text(
 @app.post("/hrassistantai/compare_cv_advert_documents")
 async def compare_advert_cv(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...)):
     return await compare_documents(job_description_file , cv_file) 
+
+#save user credits
+@app.post("/hrassistantai/add_credits", response_model=CreditSchema)
+def add_credit(data: AddCreditRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == data.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User Not Found")
+    
+    new_credit = Credits(
+        user_id= data.user_id,
+        amount= data.amount 
+    )
+
+    db.add(new_credit)
+    db.commit()
+    db.refresh(new_credit)
+
+
+#get credits
+@app.get("/hrassistantai/get_credits/{user_id}")
+def get_user_credits(user_id:int ,db:Session = Depends(get_db)):
+    return db.query(Credits).filter(Credits.user_id == user_id).order_by(Credits.created_at.desc()).all()
