@@ -1,6 +1,7 @@
-from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query
+from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query , BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import io
 from typing import List , Dict, Any
 from fastapi.responses import JSONResponse , StreamingResponse
 from pydantic import BaseModel , EmailStr
@@ -13,6 +14,9 @@ from app.compare_advert_with_customer_cv import compare_texts,compare_documents,
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
 from app.models.user_model import User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.cv_generator import *
+from app.services.payment import create_payment_intent
+
 from app.utils.auth import create_access_token
 from collections import defaultdict
 import zipfile
@@ -288,3 +292,47 @@ def add_credit(data: AddCreditRequest, db: Session = Depends(get_db)):
 @app.get("/hrassistantai/get_credits/{user_id}")
 def get_user_credits(user_id:int ,db:Session = Depends(get_db)):
     return db.query(Credits).filter(Credits.user_id == user_id).order_by(Credits.created_at.desc()).all()
+
+
+#create payment intent 
+@app.get("/hrassistantai/create_payment_intent")
+def create_intent(amount: float = Query(...,gt=0)):
+    amount_in_cents = int(amount*100)
+    return create_payment_intent(amount_in_cents)
+
+#generate cv
+@app.post("/hrassistantai/generate_cv")
+async def generate_cv_with_llm_endpoint(
+    user_cv: UploadFile = File(...),
+    template_file: UploadFile = File(...)
+):
+    # Read both files
+    user_bytes = await user_cv.read()
+    template_bytes = await template_file.read()
+
+    if not user_bytes:
+        raise HTTPException(400, "User CV file is empty")
+    if not template_bytes:
+        raise HTTPException(400, "Template CV file is empty")
+
+    # Extract text
+    user_text = extract_text_from_docx(user_bytes)
+    template_text = extract_text_from_docx(template_bytes)
+
+    if not user_text.strip():
+        raise HTTPException(400, "User CV has no readable text")
+    if not template_text.strip():
+        raise HTTPException(400, "Template CV has no readable text")
+
+    # Ask LLM to rewrite
+    generated_text = generate_cv_with_llm(user_text, template_text)
+
+    # Create DOCX from generated text
+    generated_docx_bytes = create_docx_from_text(template_bytes, generated_text)
+
+    # Return file
+    return StreamingResponse(
+        io.BytesIO(generated_docx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "attachment; filename=generated_cv.docx"}
+    )

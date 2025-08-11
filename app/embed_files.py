@@ -2,7 +2,7 @@ import os
 import re
 from pathlib import Path
 
-from langchain.document_loaders import (
+from langchain_community.document_loaders import (
     PyPDFLoader,
     Docx2txtLoader,
     TextLoader,
@@ -11,8 +11,8 @@ from langchain.document_loaders import (
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
 import hashlib
 
 # Configurations
