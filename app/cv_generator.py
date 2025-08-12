@@ -3,6 +3,8 @@ import os
 from docx import Document
 from openai import OpenAI
 from dotenv import load_dotenv
+import tempfile
+from docx2pdf import convert
 
 # --- Load environment variables ---
 load_dotenv()
@@ -72,3 +74,20 @@ def create_docx_from_text(template_bytes: bytes, generated_text: str) -> bytes:
     output_stream = io.BytesIO()
     new_doc.save(output_stream)
     return output_stream.getvalue()
+
+
+
+def convert_docx_bytes_to_pdf_bytes(docx_bytes: bytes) -> bytes:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        docx_path = os.path.join(tmpdir, "temp.docx")
+        pdf_path = os.path.join(tmpdir , "temp.pdf")
+
+        with open(docx_path , "wb") as f:
+            f.write(docx_bytes)
+
+        convert(docx_path , pdf_path) #requires Ms Word Installed
+
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+
+    return pdf_bytes

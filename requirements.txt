@@ -42,3 +42,4 @@ beautifulsoup4
 python-magic 
 python-magic-bin
 pypdf
+docx2pdf

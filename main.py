@@ -10,10 +10,10 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
-from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest
+from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 
@@ -22,6 +22,8 @@ from collections import defaultdict
 import zipfile
 from io import BytesIO
 from pathlib import Path
+import base64
+from app.momopayment import request_to_pay, generate_uuid 
 
 
 CV_STORAGE_DIR = Path("cv_documents")
@@ -300,6 +302,20 @@ def create_intent(amount: float = Query(...,gt=0)):
     amount_in_cents = int(amount*100)
     return create_payment_intent(amount_in_cents)
 
+# provide reasons low score api
+@app.post("/hrassistantai/low_score_explanation")
+async def generate_low_score_reason(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...)):
+    return await explain_low_score(job_description_file , cv_file)
+
+
+#request to pay
+@app.post("/hrassistantai/request_to_pay")
+def request_to_pay_to_add_credits(data: RequestToPay):
+    uuid = generate_uuid()
+    result = request_to_pay(data.amount , data.msisdn , uuid)
+
+    return result
+
 #generate cv
 @app.post("/hrassistantai/generate_cv")
 async def generate_cv_with_llm_endpoint(
@@ -330,9 +346,14 @@ async def generate_cv_with_llm_endpoint(
     # Create DOCX from generated text
     generated_docx_bytes = create_docx_from_text(template_bytes, generated_text)
 
-    # Return file
-    return StreamingResponse(
-        io.BytesIO(generated_docx_bytes),
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": "attachment; filename=generated_cv.docx"}
-    )
+    # Create a PDF
+    generated_pdf_bytes = convert_docx_bytes_to_pdf_bytes(generated_docx_bytes)
+
+    # Return files
+    return JSONResponse({
+        "docx": base64.b64encode(generated_docx_bytes).decode(),
+        "pdf": base64.b64encode(generated_pdf_bytes).decode(),
+    })
+
+   
+

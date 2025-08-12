@@ -1,5 +1,4 @@
 import os
-import re
 from pathlib import Path
 
 from langchain_community.document_loaders import (
@@ -121,10 +120,10 @@ def embed_folder(folder_path , output_path):
 
 
 # Run the embedding process
-if __name__ == "__main__":
-    result = embed_folder(INPUT_FOLDER, VECTOR_DB_PATH)
-    print("\nEmbedding Summary")
-    print(f"- Processed documents: {result['total_documents']}")
-    print(f"- Created chunks: {result['total_chunks']}")
-    print(f"- Failed files: {len(result['failed_files'])}")
-    print(f"- Vector DB location: {result['vector_db_path']}")
+#if __name__ == "__main__":
+#    result = embed_folder(INPUT_FOLDER, VECTOR_DB_PATH)
+#    print("\nEmbedding Summary")
+#    print(f"- Processed documents: {result['total_documents']}")
+#    print(f"- Created chunks: {result['total_chunks']}")
+#    print(f"- Failed files: {len(result['failed_files'])}")
+#    print(f"- Vector DB location: {result['vector_db_path']}")
