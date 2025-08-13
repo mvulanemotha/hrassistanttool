@@ -313,6 +313,9 @@ async def generate_low_score_reason(job_description_file: UploadFile = File(...)
 def request_to_pay_to_add_credits(data: RequestToPay):
     uuid = generate_uuid()
     result = request_to_pay(data.amount , data.msisdn , uuid)
+    
+    print(result)
+  
 
     return result
 

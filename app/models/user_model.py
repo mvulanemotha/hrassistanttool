@@ -13,9 +13,10 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
-    password = Column(String)  # hashed password
-    name = Column(String)
+    password = Column(String , nullable=False)  # hashed password
+    name = Column(String , nullable=False)
     user = Column(String , nullable=False)
+    country = Column(String , nullable=False)
     created_at = Column(DateTime , default=datetime.utcnow)
    
     def __repr__(self):
@@ -172,4 +173,5 @@ class AddCreditRequest(BaseModel):
 
 class RequestToPay(BaseModel):
     amount: float
-    msisdn: str    
+    msisdn: str
+    user_id: int
