@@ -196,3 +196,4 @@ class RequestToPay(BaseModel):
 class LowScoreRequest(BaseModel):
     job_description: str
     cv_text: str
+    required_units:int
