@@ -62,7 +62,7 @@ def request_to_pay(amount , msisdn , uuid):
 
     #header
     headers = {
-       "Authorization": f"Bearer {token_data["access_token"]}",
+       "Authorization": f"Bearer {token_data['access_token']}",
        "X-Reference-Id": uuid,  # same format as d6404b78-03ca-4c8c-9709-6540053da4e0
        "X-Target-Environment": os.getenv("X_Target_Environment"),  # or "production"
        "Content-Type": "application/json",
@@ -149,7 +149,7 @@ async def update_transactions_credits ():
                 credit_record = db.query(Credits).filter(Credits.user_id == transaction.user_id).first()
 
                 if credit_record:
-                    credit_record += transaction.amount
+                    credit_record.amount += transaction.amount
                     print(f"💰 Credit updated: {credit_record.amount}")
 
             elif status == "FAILED":
