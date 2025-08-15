@@ -1,4 +1,4 @@
-from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query , BackgroundTasks
+from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query , BackgroundTasks , Form
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import io
@@ -288,7 +288,13 @@ def compare_cv_job_description_text(
     
 # compare document cv and document advert
 @app.post("/hrassistantai/compare_cv_advert_documents")
-async def compare_advert_cv(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...),allowed: bool = Depends(check_user_units)):
+async def compare_advert_cv(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...),
+                            required_units: int = Form(...) , user_id : int = Form(...),
+                            db: Session = Depends(get_db)
+                             ):
+    
+    check_user_units(user_id,required_units , db)
+
     return await compare_documents(job_description_file , cv_file) 
 
 #save user credits
@@ -328,7 +334,14 @@ async def generate_low_score_reason(job_description_file: UploadFile = File(...)
 
 #explain score not from file but from job descrption and cv text pasted
 @app.post("/hrassistantai/explain_low_score_in_text")
-async def low_score_reason(data: LowScoreRequest , allowed: bool = Depends(check_user_units)):
+async def low_score_reason(data: LowScoreRequest, db: Session = Depends(get_db) ):
+    
+    #Manually check units for this request
+    check_user_units(
+        user_id=data.user_id,
+        required_units=data.required_units,
+        db=db
+    )
     return await explain_low_score_in_text(data.job_description , data.cv_text)
 
 

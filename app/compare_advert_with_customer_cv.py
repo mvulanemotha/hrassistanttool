@@ -22,7 +22,9 @@ from PIL import Image
 load_dotenv()
 
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt", ".doc"]
+
+ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt", ".doc", ".jpg", ".jpeg", ".png"]
+
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
