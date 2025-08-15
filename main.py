@@ -102,7 +102,7 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
         #assign credits to new user user
         initial_credits = Credits(
             user_id=db_user.id,
-            amount=10,
+            amount=300,
             created_at=datetime.utcnow()
         )
 
