@@ -54,19 +54,4 @@ def compare_with_job_description(job_description: str):
     print(f"[INFO] Found {len(best_by_file)} matching CV(s).")
     return best_by_file
 
-# === Main run ===
-if __name__ == "__main__":
-    print("Paste the job description below (press Enter when done):")
-    print("(Type your job description. When finished, type 'END' on a new line.)")
-    job_desc_lines = []
-    while True:
-        line = input()
-        if line.strip().upper() == "END":
-            break
-        job_desc_lines.append(line)
 
-    job_description_text = "\n".join(job_desc_lines).strip()
-    if job_description_text:
-        compare_with_job_description(job_description_text)
-    else:
-        print("[ERROR] No job description provided.")

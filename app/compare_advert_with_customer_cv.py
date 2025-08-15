@@ -11,9 +11,13 @@ from pathlib import Path
 import tempfile
 import subprocess
 import os
+import io
 from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi.concurrency import run_in_threadpool
+import pytesseract
+from PIL import Image
+
 
 load_dotenv()
 
@@ -62,6 +66,17 @@ def compare_texts(payload:CompareRequest):
         "score" : round(float(similarity), 4),
         "interpretation" : "1.0 = perfect match, 0 = no match"
     }
+
+# extract
+def extract_text_from_image(image_bytes: bytes) -> str:
+    """
+    Extract text from an image (PNG, JPG, etc) using Tesseract OCR
+    """
+
+    image  = Image.open(io.BytesIO(image_bytes))
+    text = pytesseract.image_to_string(image)
+
+    return text.strip()
 
 # extract text
 def extract_pdf(file_bytes: bytes) -> str:
@@ -121,6 +136,8 @@ async def extract_uploaded_text(file: UploadFile = File(...)):
             text = extract_txt(file_bytes)
         elif ext == ".doc":
             text = extract_doc(file_bytes)
+        elif ext in [".jpg" , ".jpeg" , ".png"]:
+            text = extract_text_from_image(file_bytes)
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
     except Exception as e:
