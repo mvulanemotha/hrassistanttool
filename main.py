@@ -4,16 +4,16 @@ import os
 import io
 from typing import List , Dict, Any
 from fastapi.responses import JSONResponse , StreamingResponse
-from pydantic import BaseModel , EmailStr
+from pydantic import  ValidationError , BaseModel
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
-from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score
+from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 
@@ -23,7 +23,10 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 import base64
-from app.momopayment import request_to_pay, generate_uuid 
+from app.momopayment import request_to_pay, generate_uuid , update_transactions_credits_periodically 
+from app.creditchargies import CHARGES , check_user_units
+import asyncio
+
 
 
 CV_STORAGE_DIR = Path("cv_documents")
@@ -71,7 +74,7 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
   
     # create jwt token
     access_token = create_access_token(data={"sub": db_user.email})
-    return { "access_token" : access_token , "status_code" : 200 , "user_id": db_user.id , "user": db_user.user , "name" : db_user.name } 
+    return { "access_token" : access_token , "status_code" : 200 , "user_id": db_user.id , "user": db_user.user , "name" : db_user.name , "email": db_user.email } 
 
 # create a new user
 @app.post("/hrassistantai/newuser")
@@ -79,34 +82,48 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
     """ 
     create a new user
     """
-    # check if user exists
-    existing_user = db.query(User).filter(User.email == user.email).first()
-    if existing_user:
-        #raise HTTPException(status_code=400, detail="Email already registered")
-        return { "status_code" : 400 , "message" : "Email already registered" }
-    # Hash the password
-    hashed_password = pwd_context.hash(user.password)
+    try:
+        # check if user exists
+        existing_user = db.query(User).filter(User.email == user.email).first()
+        if existing_user:
+            #raise HTTPException(status_code=400, detail="Email already registered")
+            return { "status_code" : 400 , "message" : "Email already registered" }
+        # Hash the password
+        hashed_password = pwd_context.hash(user.password)
+        
+        #Create new user object
+        db_user = User(email=user.email, password=hashed_password , name=user.name , user=user.user , country=user.country , contact=user.contact )
 
-    #Create new user object
-    db_user = User(email=user.email, password=hashed_password , name=user.name , user=user.user )
+        # Add to DB and commit
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
 
-    # Add to DB and commit
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+        #assign credits to new user user
+        initial_credits = Credits(
+            user_id=db_user.id,
+            amount=10,
+            created_at=datetime.utcnow()
+        )
 
-    #assign credits to new user user
-    initial_credits = Credits(
-        user_id=db_user.id,
-        amount=10,
-        created_at=datetime.utcnow()
-    )
-
-    db.add(initial_credits)
-    db.commit()
- 
-    return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 , "user":db_user.user , "credits": initial_credits.amount }
-
+        db.add(initial_credits)
+        db.commit()
+    
+        return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 , "user":db_user.user , "credits": initial_credits.amount }
+    except ValidationError as e:
+        # Handle Pydantic validation errors
+        return {
+            "status_code": 422,
+            "message": "Validation error",
+            "detail": e.errors()  # Provides specific validation error details
+        }
+    except Exception as e:
+        # Handle other unexpected errors
+        return {
+            "status_code": 500,
+            "message": "Internal server error",
+            "detail": str(e)
+        }
 
 @app.post("/hrassistantai/upload_cv_embed")
 #call function to upload files
@@ -150,7 +167,7 @@ async def upload_cv_embed(files: list[UploadFile] = File(...) , user_id:str = Fi
 
 @app.get("/hrassistantai/compare_job_description")
 #call function to compare job description with stored CVs
-def compare_job_description_endpoint(job_description: str):
+def compare_job_description_endpoint(job_description: str , allowed: bool = Depends(check_user_units)):
     """
     Compare a job description with stored CVs and return the best matches.
     Pass the job description as a query paramenter or request body.
@@ -173,7 +190,7 @@ def compare_job_description_endpoint(job_description: str):
 
 @app.post("/hrassistantai/save_matches" , response_model=MatchHistorySchema)
 def save_matches_history(payload:SaveMatchesRequest, db: Session = Depends(get_db)):
-    print(payload.dict())
+    
     history = MatchHistory(user_id=payload.user_id , job_description=payload.jobDescription, job_title=payload.job_title, created_at=datetime.utcnow())
     db.add(history)
     db.commit()
@@ -262,7 +279,8 @@ def getMatched_cvs(match_id:int , db: Session = Depends(get_db)):
 @app.get("/hrassistantai/compare_text_cv_job_description")
 def compare_cv_job_description_text(
     job_description: str = Query(...),
-    cv_text: str = Query(...)
+    cv_text: str = Query(...),
+    allowed: bool = Depends(check_user_units)
 ):
     # You can still reuse your CompareRequest model internally if you want
     payload = CompareRequest(job_description=job_description, cv_text=cv_text)
@@ -270,7 +288,7 @@ def compare_cv_job_description_text(
     
 # compare document cv and document advert
 @app.post("/hrassistantai/compare_cv_advert_documents")
-async def compare_advert_cv(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...)):
+async def compare_advert_cv(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...),allowed: bool = Depends(check_user_units)):
     return await compare_documents(job_description_file , cv_file) 
 
 #save user credits
@@ -304,18 +322,33 @@ def create_intent(amount: float = Query(...,gt=0)):
 
 # provide reasons low score api
 @app.post("/hrassistantai/low_score_explanation")
-async def generate_low_score_reason(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...)):
+async def generate_low_score_reason(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...), allowed: bool = Depends(check_user_units)):
     return await explain_low_score(job_description_file , cv_file)
+
+
+#explain score not from file but from job descrption and cv text pasted
+@app.post("/hrassistantai/explain_low_score_in_text")
+async def low_score_reason(data: LowScoreRequest , allowed: bool = Depends(check_user_units)):
+    return await explain_low_score_in_text(data.job_description , data.cv_text)
 
 
 #request to pay
 @app.post("/hrassistantai/request_to_pay")
-def request_to_pay_to_add_credits(data: RequestToPay):
+def request_to_pay_to_add_credits(data: RequestToPay , db:Session = Depends(get_db)):
+
     uuid = generate_uuid()
     result = request_to_pay(data.amount , data.msisdn , uuid)
     
-    print(result)
-  
+    #save transactions user_id
+    transaction_data = Transactions(
+        user_id = data.user_id,
+        reference_id = uuid,
+        amount = data.amount
+    )
+
+    db.add(transaction_data)
+    db.commit()
+    db.refresh(transaction_data)
 
     return result
 
@@ -323,7 +356,8 @@ def request_to_pay_to_add_credits(data: RequestToPay):
 @app.post("/hrassistantai/generate_cv")
 async def generate_cv_with_llm_endpoint(
     user_cv: UploadFile = File(...),
-    template_file: UploadFile = File(...)
+    template_file: UploadFile = File(...),
+    allowed: bool = Depends(check_user_units)
 ):
     # Read both files
     user_bytes = await user_cv.read()
@@ -358,5 +392,35 @@ async def generate_cv_with_llm_endpoint(
         "pdf": base64.b64encode(generated_pdf_bytes).decode(),
     })
 
-   
 
+#get charge sheet
+@app.get("/hrassistantai/chargies")
+def get_chargies():
+    return JSONResponse(content=CHARGES ,status_code=200)
+
+#Runnning on startup
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(update_transactions_credits_periodically())
+
+
+class PassModel(BaseModel):
+    password: str
+
+# Update password
+@app.put("/hrassistantai/changepass/{user_id}") 
+def change_pass(user_id: int, password: PassModel , db:Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+
+    try:
+        if not user:
+            raise HTTPException(status_code = 400 , detail="User not found")
+        
+        user.password = pwd_context.hash(password.password)
+
+        db.commit()
+
+        return JSONResponse(status_code=200 , content={ "message" : "Password changed succesfully"})
+
+    except ValueError as e:
+        raise HTTPException(status_code= 500, detail={str(e)}) 

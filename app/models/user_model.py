@@ -2,21 +2,25 @@ from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, DateTim
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database.database import Base
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
+from pydantic import BaseModel, EmailStr , constr , field_validator
+from typing import List, Optional 
 
 # =============================
 # ✅ SQLAlchemy MODELS
 # =============================
 
 class User(Base):
+    
     __tablename__ = "users"
+
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     password = Column(String , nullable=False)  # hashed password
     name = Column(String , nullable=False)
     user = Column(String , nullable=False)
     country = Column(String , nullable=False)
+    contact = Column(String , nullable=False)
+
     created_at = Column(DateTime , default=datetime.utcnow)
    
     def __repr__(self):
@@ -29,6 +33,7 @@ class User(Base):
     transactions = relationship("Transactions" , back_populates="user")  
 
 class Credits(Base):
+    
     __tablename__ = "credits"
 
     id = Column(Integer , primary_key=True , index=True)
@@ -40,6 +45,7 @@ class Credits(Base):
     user = relationship("User" , back_populates="credits")
 
 class Transactions(Base):
+    
     __tablename__ = "transactions"
 
     id = Column(Integer , primary_key=True , index=True)
@@ -112,6 +118,17 @@ class UserCreate(BaseModel):
     password: str
     name: str
     user: str
+    country: str
+    contact: str
+
+    @field_validator('contact')
+    def validate_contact(cls, v):
+       import re
+       pattern = r"^\+\d{1,4}\d{6,14}$"
+       if not re.match(pattern, v):
+           raise ValueError("Contact must be in the format: +<country code><number>")
+       return v
+
 
 # ------------------------------
 # Match history/result schemas
@@ -175,3 +192,7 @@ class RequestToPay(BaseModel):
     amount: float
     msisdn: str
     user_id: int
+
+class LowScoreRequest(BaseModel):
+    job_description: str
+    cv_text: str

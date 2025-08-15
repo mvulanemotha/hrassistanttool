@@ -3,6 +3,11 @@ import uuid
 import base64
 import requests
 import os
+from app.database.database import SessionLocal
+from app.models.user_model import Transactions , Credits
+from sqlalchemy.orm import Session
+import asyncio
+
 
 load_dotenv()
 
@@ -88,4 +93,90 @@ def request_to_pay(amount , msisdn , uuid):
             "error": str(e),
             "message": "Failed to process payment"
         }
+
+
+# check if a user has approved a transaction
+def momo_status(uuid:str):
+    """ Check if MoMo transaction has been approved """
+    try:
+
+       #get tokens
+       token_data = get_mtn_token()
+       access_token = token_data["access_token"]
+
+       headers = {
+            "Ocp-Apim-Subscription-Key": os.getenv("Ocp_Apim_Subscription_Key"),
+            "Authorization": f"Bearer {access_token}",
+            "X-Target-Environment": os.getenv("X_Target_Environment"),
+            "Connection": "keep-alive"
+        }
+
+       res = requests.get(f"{url}v1_0/requesttopay/{uuid}" , headers=headers)
+
+       if res.status_code == 200:
+           status = res.json().get("status")
+           print(f"✅ Payment Status: {status}")
+           return status
+           
+       else:
+           print(f"❌ API Error: {res.status_code} - {res.text}")
+           return 0
+
+    except Exception as e:
+        print(f"⚠️ Exception occurred: {str(e)}")
+        return 0
+
+# get database
+async def update_transactions_credits ():
+
+    print("🔍 Checking pending MoMo transactions...")
+
+    db: Session = SessionLocal()
+
+    try:
+
+        #Get a transaction with status = 0
+        transaction = db.query(Transactions).filter(Transactions.status == 0).first()
+
+        if transaction and transaction.reference_id:
+            status =  momo_status(transaction.reference_id)
+
+            # Map MoMo API status to your DB status
+            if status == "SUCCESSFUL":
+                transaction.status = 1  # e.g., 1 = Paid
+                
+                # 🔹 Update Credit table
+                credit_record = db.query(Credits).filter(Credits.user_id == transaction.user_id).first()
+
+                if credit_record:
+                    credit_record += transaction.amount
+                    print(f"💰 Credit updated: {credit_record.amount}")
+
+            elif status == "FAILED":
+                transaction.status = -1  # e.g., -1 = Failed
+            elif status == "PENDING":
+                print("Transaction is still pending, no update.")
+                return
+            
+            db.commit()
+            print(f"✅ Transaction {transaction.reference_id} updated to status {transaction.status}")
+
+        else:
+            print("No pending transaction")
+
+    finally:
+        db.close()
+
+
+# call function update_transactions_credits periodically
+
+async def update_transactions_credits_periodically():
+    while True:
+        try:
+            print("🔄 Checking pending transactions and updating credits...")
+            await update_transactions_credits() 
+        except Exception as e:
+            print(f"⚠️ Error in updating transactions: {e}")
+        await asyncio.sleep(10) # wait 10 seconds before checking again
+
 

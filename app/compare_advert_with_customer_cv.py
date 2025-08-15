@@ -205,3 +205,51 @@ async def explain_low_score(job_description_file: UploadFile = File(...),
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+#explain low cv score
+async def explain_low_score_in_text(job_text , cv_text):
+    try:
+
+        # Compute embeddings & similarity (sync, quick enough)
+        job_embed = embedder.embed_query(job_text)
+        cv_embed = embedder.embed_query(cv_text)
+        similarity = cosine_similarity(
+            np.array(job_embed).reshape(1, -1),
+            np.array(cv_embed).reshape(1, -1)
+        )[0][0]
+
+        # Compose prompt
+        prompt = f"""
+            The similarity score between this job description and CV is {similarity:.4f} (0 means no match, 1 means perfect match).
+
+            Job Description:
+            {job_text}
+
+            CV:
+            {cv_text}
+
+            Explain in detail why the CV might have scored low against this job description.
+            Highlight missing skills, experiences, or keywords.
+            Provide suggestions on how to improve the CV for this job.
+            """
+
+        # Run synchronous client call in threadpool
+        def sync_openai_call():
+            return client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=350,
+                temperature=0.7,
+            )
+
+        response = await run_in_threadpool(sync_openai_call)
+        explanation = response.choices[0].message.content.strip()
+
+        return {
+            "similarity_score": round(float(similarity), 4),
+            "explanation": explanation
+        }
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
