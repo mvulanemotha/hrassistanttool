@@ -42,3 +42,5 @@ beautifulsoup4
 python-magic 
 pypdf
 docx2pdf
+pillow
+pytesseract

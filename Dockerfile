@@ -9,6 +9,12 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
+    tesseract-ocr \
+    libtesseract-dev \
+    libleptonica-dev \
+    pkg-config \
+    poppler-utils \
+    libmagic-dev \
     && rm -rf /var/lib/apt/lists/*
 
 
