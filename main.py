@@ -375,8 +375,12 @@ def request_to_pay_to_add_credits(data: RequestToPay , db:Session = Depends(get_
 async def generate_cv_with_llm_endpoint(
     user_cv: UploadFile = File(...),
     template_file: UploadFile = File(...),
-    allowed: bool = Depends(check_user_units)
+    user_id: int = Form(...),
+    required_units: int = Form(...),
+    db: Session = Depends(get_db)
 ):
+    
+
     # Read both files
     user_bytes = await user_cv.read()
     template_bytes = await template_file.read()
@@ -385,6 +389,9 @@ async def generate_cv_with_llm_endpoint(
         raise HTTPException(400, "User CV file is empty")
     if not template_bytes:
         raise HTTPException(400, "Template CV file is empty")
+
+    #check_user_units
+    check_user_units(user_id , required_units , db)
 
     # Extract text
     user_text = extract_text_from_docx(user_bytes)
