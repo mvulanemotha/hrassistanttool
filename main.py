@@ -328,7 +328,12 @@ def create_intent(amount: float = Query(...,gt=0)):
 
 # provide reasons low score api
 @app.post("/hrassistantai/low_score_explanation")
-async def generate_low_score_reason(job_description_file: UploadFile = File(...) , cv_file: UploadFile = File(...), allowed: bool = Depends(check_user_units)):
+async def generate_low_score_reason(job_description_file: UploadFile = File(...),  
+                                    cv_file: UploadFile = File(...), 
+                                    user_id: int = Form(...),
+                                    required_units: int = Form(...),
+                                    db: Session = Depends(get_db)):
+    check_user_units(user_id,required_units,db)
     return await explain_low_score(job_description_file , cv_file)
 
 
