@@ -280,6 +280,8 @@ def getMatched_cvs(match_id:int , db: Session = Depends(get_db)):
 def compare_cv_job_description_text(
     job_description: str = Query(...),
     cv_text: str = Query(...),
+    user_id: int = Query(...),
+    required_units: int = Query(...),
     allowed: bool = Depends(check_user_units)
 ):
     # You can still reuse your CompareRequest model internally if you want
