@@ -411,14 +411,18 @@ async def generate_cv_with_llm_endpoint(
     generated_docx_bytes = create_docx_from_text(template_bytes, generated_text)
 
     # Create a PDF
-    generated_pdf_bytes = convert_docx_bytes_to_pdf_bytes(generated_docx_bytes)
+    #generated_pdf_bytes = convert_docx_bytes_to_pdf_bytes(generated_docx_bytes)
 
     # Return files
-    return JSONResponse({
-        "docx": base64.b64encode(generated_docx_bytes).decode(),
-        "pdf": base64.b64encode(generated_pdf_bytes).decode(),
-    })
+    #return JSONResponse({
+    #    "docx": base64.b64encode(generated_docx_bytes).decode()
+    #    "pdf": base64.b64encode(generated_pdf_bytes).decode(),
+    #})
 
+      # Return files
+    return JSONResponse({
+        "docx": base64.b64encode(generated_docx_bytes).decode()
+    })    
 
 #get charge sheet
 @app.get("/hrassistantai/chargies")
