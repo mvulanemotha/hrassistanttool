@@ -26,7 +26,7 @@ import base64
 from app.momopayment import request_to_pay, generate_uuid , update_transactions_credits_periodically 
 from app.creditchargies import CHARGES , check_user_units
 import asyncio
-
+from app.generate_cv import get_available_templates , generate_cv,CVRequest
 
 
 CV_STORAGE_DIR = Path("cv_documents")
@@ -372,7 +372,7 @@ def request_to_pay_to_add_credits(data: RequestToPay , db:Session = Depends(get_
 
     return result
 
-#generate cv
+# Update your endpoint to use the attorney-specific functions
 @app.post("/hrassistantai/generate_cv")
 async def generate_cv_with_llm_endpoint(
     user_cv: UploadFile = File(...),
@@ -381,48 +381,43 @@ async def generate_cv_with_llm_endpoint(
     required_units: int = Form(...),
     db: Session = Depends(get_db)
 ):
-    
-
     # Read both files
     user_bytes = await user_cv.read()
     template_bytes = await template_file.read()
 
     if not user_bytes:
+        print(f"User CV file is empty")
         raise HTTPException(400, "User CV file is empty")
     if not template_bytes:
+        print(f"Template CV file is empty")
         raise HTTPException(400, "Template CV file is empty")
 
-    #check_user_units
-    check_user_units(user_id , required_units , db)
+    # Check user units (implementation depends on your system)
+    check_user_units(user_id, required_units, db)
 
     # Extract text
     user_text = extract_text_from_docx(user_bytes)
     template_text = extract_text_from_docx(template_bytes)
 
     if not user_text.strip():
+        print(f"User CV has no readable text")
         raise HTTPException(400, "User CV has no readable text")
     if not template_text.strip():
+        print(f"Template CV has no readable text")
         raise HTTPException(400, "Template CV has no readable text")
 
-    # Ask LLM to rewrite
-    generated_text = generate_cv_with_llm(user_text, template_text)
-
-    # Create DOCX from generated text
-    generated_docx_bytes = create_docx_from_text(template_bytes, generated_text)
-
-    # Create a PDF
-    #generated_pdf_bytes = convert_docx_bytes_to_pdf_bytes(generated_docx_bytes)
-
-    # Return files
-    #return JSONResponse({
-    #    "docx": base64.b64encode(generated_docx_bytes).decode()
-    #    "pdf": base64.b64encode(generated_pdf_bytes).decode(),
-    #})
-
-      # Return files
+    # Check if this is an attorney resume template
+    is_attorney_template = "attorney" in template_file.filename.lower() or "legal" in template_text.lower()
+    
+    if is_attorney_template:
+        # Use attorney-specific generation
+        generated_text = generate_attorney_cv_with_llm(user_text, template_text)
+        generated_docx_bytes = create_attorney_docx_from_text(generated_text)
+  
+    # Return the enhanced DOCX file
     return JSONResponse({
         "docx": base64.b64encode(generated_docx_bytes).decode()
-    })    
+    })
 
 #get charge sheet
 @app.get("/hrassistantai/chargies")
@@ -455,3 +450,8 @@ def change_pass(user_id: int, password: PassModel , db:Session = Depends(get_db)
 
     except ValueError as e:
         raise HTTPException(status_code= 500, detail={str(e)}) 
+    
+
+
+
+

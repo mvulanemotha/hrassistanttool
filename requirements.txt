@@ -44,3 +44,5 @@ pypdf
 docx2pdf
 pillow
 pytesseract
+pyyaml
+rendercv[full]

@@ -192,18 +192,36 @@ async def explain_low_score(job_description_file: UploadFile = File(...),
 
         # Compose prompt
         prompt = f"""
-            The similarity score between this job description and CV is {similarity:.4f} (0 means no match, 1 means perfect match).
+        The similarity score between the job description and CV is {similarity*100:.2f}%.
+        A low score means the CV does not align well with the job description.
 
-            Job Description:
-            {job_text}
+        === Job Description ===
+        {job_text}
 
-            CV:
-            {cv_text}
+        === CV ===
+        {cv_text}
 
-            Explain in detail why the CV might have scored low against this job description.
-            Highlight missing skills, experiences, or keywords.
-            Provide suggestions on how to improve the CV for this job.
-            """
+        Your task:
+        - Be precise and structured.
+        - Do not use bold text, asterisks, or Markdown formatting in your response.
+        - First explain briefly why the score is low (biggest mismatches).
+        - Then list exactly which skills, experiences, or keywords are missing from the CV.
+        - Finally, give actionable suggestions for improving the CV so it aligns with this job.
+
+        Format your response exactly as:
+
+        Explanation:
+        - (1–3 short bullet points on why the CV scored low)
+
+        Missing Skills/Keywords:
+        - (bullet list, only the most important missing items)
+
+        Suggestions for Improvement:
+        - (bullet list of concrete edits or additions to the CV)
+
+        Keep the answer concise, clear, and easy for the user to follow.
+        """
+
 
         # Run synchronous client call in threadpool
         def sync_openai_call():
@@ -227,10 +245,9 @@ async def explain_low_score(job_description_file: UploadFile = File(...),
 
 
 #explain low cv score
-async def explain_low_score_in_text(job_text , cv_text):
+async def explain_low_score_in_text(job_text, cv_text):
     try:
-
-        # Compute embeddings & similarity (sync, quick enough)
+        # Compute embeddings & similarity
         job_embed = embedder.embed_query(job_text)
         cv_embed = embedder.embed_query(cv_text)
         similarity = cosine_similarity(
@@ -238,28 +255,45 @@ async def explain_low_score_in_text(job_text , cv_text):
             np.array(cv_embed).reshape(1, -1)
         )[0][0]
 
-        # Compose prompt
+        # Refined prompt
         prompt = f"""
-            The similarity score between this job description and CV is {similarity:.4f} (0 means no match, 1 means perfect match).
+            The similarity score between the job description and CV is {similarity*100:.2f}%.
+            A low score means the CV does not align well with the job description.
 
-            Job Description:
+            === Job Description ===
             {job_text}
 
-            CV:
+            === CV ===
             {cv_text}
 
-            Explain in detail why the CV might have scored low against this job description.
-            Highlight missing skills, experiences, or keywords.
-            Provide suggestions on how to improve the CV for this job.
+            Your task:
+            - Be precise and structured.
+            - First explain briefly why the score is low (biggest mismatches).
+            - Then list exactly which skills, experiences, or keywords are missing from the CV.
+            - Finally, give actionable suggestions for improving the CV so it aligns with this job.
+
+            Format your response as:
+
+            Explanation:
+            - (1–3 short bullet points on why the CV scored low)
+
+            Missing Skills/Keywords:
+            - (bullet list, only the most important missing items)
+
+            Suggestions for Improvement:
+            - (bullet list of concrete edits or additions to the CV)
+
+            Keep the answer concise, clear, and easy for the user to follow.
             """
+
 
         # Run synchronous client call in threadpool
         def sync_openai_call():
             return client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=350,
-                temperature=0.7,
+                max_tokens=400,
+                temperature=0.5,
             )
 
         response = await run_in_threadpool(sync_openai_call)
