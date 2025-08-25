@@ -46,3 +46,4 @@ pillow
 pytesseract
 pyyaml
 rendercv[full]
+alembic

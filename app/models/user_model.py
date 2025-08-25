@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime , timedelta
 from app.database.database import Base
 from pydantic import BaseModel, EmailStr , constr , field_validator
 from typing import List, Optional 
@@ -103,6 +103,21 @@ class UserCVUpload(Base):
     #optional: relationship to User
     user = relationship("User", back_populates="uploaded_cvs")
 
+class OTP(Base):
+    __tablename__ = "otps"
+    
+    id = Column(Integer , primary_key=True , index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    otp_code = Column(String(6), nullable=False)  # 4-digit OTP
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=10))
+
+    # Relationship
+    user = relationship("User", backref="otps")
+
+
+
+
 # =============================
 # ✅ Pydantic SCHEMAS
 # =============================
@@ -198,3 +213,13 @@ class LowScoreRequest(BaseModel):
     cv_text: str
     required_units:int
     user_id:int
+
+class VerifyOtpRequest(BaseModel):
+    email : EmailStr
+    otp : str
+    password : str
+
+class ResetPasswordRequest(BaseModel):
+    user_id : int
+    otp: str
+    password : str

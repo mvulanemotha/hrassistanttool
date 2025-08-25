@@ -13,9 +13,10 @@ from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
+from app.services.email import send_email
 
 from app.utils.auth import create_access_token
 from collections import defaultdict
@@ -450,8 +451,62 @@ def change_pass(user_id: int, password: PassModel , db:Session = Depends(get_db)
 
     except ValueError as e:
         raise HTTPException(status_code= 500, detail={str(e)}) 
+
+
+#forgot password 
+@app.post("/hrassistantai/forgotpass/{email}")
+def changepass(email , db: Session = Depends(get_db)):
+    print(email)
+
+    # check if the email exists
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        return JSONResponse(status_code=400 , content="User Not Found")
+    
+    #send otp to an email address
+    otp = send_email(email)
+    
+    print(f"My OTP is {otp}")
+    
+    print(user)
+    #save 
+    otp_data = OTP(
+        user_id = user.id,
+        otp_code = otp
+    )
+
+    db.add(otp_data)
+    db.commit()
+    db.refresh(otp_data)
+
+    return JSONResponse(status_code=200 , content={"message" : "Otp sent to your email" , "user_id": user.id})
     
 
-
+@app.post("/hrassistantai/reset_password")
+def reset_password(payload: ResetPasswordRequest , db: Session = Depends(get_db)):
+    print(payload)
+    
+    # check if the otp and user_id exists
+    otp_record = db.query(OTP).filter(OTP.user_id == payload.user_id , OTP.otp_code == payload.otp).first()
+    if not otp_record:
+        print("Invalid OTP")
+        return JSONResponse(status_code=400 , content="Invalid OTP")
+    
+    #CHECK if otp is expired 
+    if otp_record.expires_at < datetime.utcnow():
+        print("OTP expired")
+        return JSONResponse(status_code=400 , content="OTP has expired")
+    
+    # update user password
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if user:
+        user.password = pwd_context.hash(payload.password)
+        db.commit()
+        db.delete(otp_record) #delete otp after use
+        db.commit()
+        return JSONResponse(status_code=200, content="Password reset successfully")
+    
+    return JSONResponse(status_code=400 , content="User not found")
 
 
