@@ -6,11 +6,11 @@ from app.models.user_model import Credits
 CHARGES = {
     "compare_text": {
         "description": "Compare plain job description text with CV text",
-        "price": 10
+        "price": 3
     },
     "compare_files": {
         "description": "Compare uploaded CV file(s) with job description file",
-        "price": 15
+        "price": 5
     },
     "get_text_reasoning": {
         "description": "Explain score and provide improvement suggestions",
@@ -22,15 +22,7 @@ CHARGES = {
     },
     "generate_cv": {
         "description": "CV generation",
-        "price": 40
-    },
-    "upload_job_advert_picture": {
-        "description": "Upload a job advert as an image for text extraction & analysis",
-        "price": 12
-    },
-    "upload_word_cv": {
-        "description": "Upload a Word CV file for analysis",
-        "price": 10
+        "price": 30
     }
 }
 
