@@ -2,6 +2,7 @@ from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query , 
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import io
+import uuid
 from typing import List , Dict, Any
 from fastapi.responses import JSONResponse , StreamingResponse
 from pydantic import  ValidationError , BaseModel
@@ -359,7 +360,7 @@ def request_to_pay_to_add_credits(data: RequestToPay , db:Session = Depends(get_
 
     uuid = generate_uuid()
     result = request_to_pay(data.amount , data.msisdn , uuid)
-    
+
     #save transactions user_id
     transaction_data = Transactions(
         user_id = data.user_id,
@@ -382,8 +383,14 @@ async def generate_cv(
     db: Session = Depends(get_db),
 ):
     try:
+
+        # Create safe unique filename
+        extension = Path(user_cv.filename).suffix   # .docx, .pdf, etc.
+        unique_name = f"{user_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex}{extension}"
+
+        file_location = f"uploaded_user_cv/{unique_name}"
+
         # Save uploaded file
-        file_location = f"uploaded_user_cv/{user_cv.filename}"
         with open(file_location, "wb") as f:
             f.write(await user_cv.read())
 
@@ -392,7 +399,7 @@ async def generate_cv(
         data = CVToProcess(
             user_id=user_id,
             template_cv=template_file,
-            user_cv=user_cv.filename
+            user_cv= unique_name
         )
 
         db.add(data)
