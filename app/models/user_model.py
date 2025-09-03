@@ -115,12 +115,35 @@ class OTP(Base):
     # Relationship
     user = relationship("User", backref="otps")
 
+# save uploaded cvs to be proccessed later
+class CVToProcess(Base):
+    __tablename__ = "cv_to_process"
 
+    id = Column(Integer , primary_key=True , index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    template_cv = Column(Integer, nullable=False) 
+    user_cv = Column(String, nullable=False)
+    created_at = Column(DateTime , default=datetime.utcnow)
+    updated_at = Column(DateTime , default=datetime.utcnow)
+    status = Column(String, default="pending")  # pending, processing, completed, failed 
+
+    user = relationship("User", backref="cvs_to_process")
 
 
 # =============================
 # ✅ Pydantic SCHEMAS
 # =============================
+
+#
+class CVProcessSchema(BaseModel):
+    id: int
+    user_id: int
+    template_cv: int
+    user_cv: str
+
+    class Config:
+        from_attributes = True
+
 
 # Login model class
 class UserLogin(BaseModel):

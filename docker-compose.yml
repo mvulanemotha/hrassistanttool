@@ -15,6 +15,7 @@ services:
     volumes:
       - ./cv_documents:/app/cv_documents
       - ./cv_vectorstore:/app/cv_vectorstore
+      - ./uploaded_user_cv:/app/uploaded_user_cv
     depends_on:
       - dbb
     networks:

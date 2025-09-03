@@ -13,7 +13,7 @@ from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 from app.services.email import send_email
@@ -374,51 +374,37 @@ def request_to_pay_to_add_credits(data: RequestToPay , db:Session = Depends(get_
     return result
 
 # Update your endpoint to use the attorney-specific functions
-@app.post("/hrassistantai/generate_cv")
-async def generate_cv_with_llm_endpoint(
-    user_cv: UploadFile = File(...),
-    template_file: UploadFile = File(...),
+@app.post("/hrassistantai/save_cv_to_process")
+async def generate_cv(
+    user_cv: UploadFile,
+    template_file: str = Form(...),
     user_id: int = Form(...),
-    required_units: int = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    # Read both files
-    user_bytes = await user_cv.read()
-    template_bytes = await template_file.read()
+    try:
+        # Save uploaded file
+        file_location = f"uploaded_user_cv/{user_cv.filename}"
+        with open(file_location, "wb") as f:
+            f.write(await user_cv.read())
 
-    if not user_bytes:
-        print(f"User CV file is empty")
-        raise HTTPException(400, "User CV file is empty")
-    if not template_bytes:
-        print(f"Template CV file is empty")
-        raise HTTPException(400, "Template CV file is empty")
+        # Save reference in DB (optional)
+        # db.add(SubmittedCV(...))
+        data = CVToProcess(
+            user_id=user_id,
+            template_cv=template_file,
+            user_cv=user_cv.filename
+        )
 
-    # Check user units (implementation depends on your system)
-    check_user_units(user_id, required_units, db)
+        db.add(data)
+        db.commit()
+        db.refresh(data)
 
-    # Extract text
-    user_text = extract_text_from_docx(user_bytes)
-    template_text = extract_text_from_docx(template_bytes)
+        return {"status_code": 201, "message": "File saved successfully", "file_id": data.id}
 
-    if not user_text.strip():
-        print(f"User CV has no readable text")
-        raise HTTPException(400, "User CV has no readable text")
-    if not template_text.strip():
-        print(f"Template CV has no readable text")
-        raise HTTPException(400, "Template CV has no readable text")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
 
-    # Check if this is an attorney resume template
-    is_attorney_template = "attorney" in template_file.filename.lower() or "legal" in template_text.lower()
     
-    if is_attorney_template:
-        # Use attorney-specific generation
-        generated_text = generate_attorney_cv_with_llm(user_text, template_text)
-        generated_docx_bytes = create_attorney_docx_from_text(generated_text)
-  
-    # Return the enhanced DOCX file
-    return JSONResponse({
-        "docx": base64.b64encode(generated_docx_bytes).decode()
-    })
 
 #get charge sheet
 @app.get("/hrassistantai/chargies")
