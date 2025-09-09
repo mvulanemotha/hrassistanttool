@@ -92,7 +92,7 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
             return { "status_code" : 400 , "message" : "Email already registered" }
         # Hash the password
         hashed_password = pwd_context.hash(user.password)
-        
+        print(user.user)
         #Create new user object
         db_user = User(email=user.email, password=hashed_password , name=user.name , user=user.user , country=user.country , contact=user.contact )
 
@@ -104,7 +104,7 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
         #assign credits to new user user
         initial_credits = Credits(
             user_id=db_user.id,
-            amount=40,
+            amount=20,
             created_at=datetime.utcnow()
         )
 
