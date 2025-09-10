@@ -14,7 +14,7 @@ from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 from app.services.email import send_email
@@ -502,4 +502,18 @@ def reset_password(payload: ResetPasswordRequest , db: Session = Depends(get_db)
     
     return JSONResponse(status_code=400 , content="User not found")
 
+@app.get("/hrassistantai/cv_progress" , response_model=List[CVProcessSchema])
+def get_cv_progress(user_id:int , db:Session = Depends(get_db)):
+    
+    try:
+
+        cvs = db.query(CVToProcess).filter(CVToProcess.user_id == user_id).all()
+
+        if not cvs :
+            return JSONResponse(status_code=400 , content="No CVs found")
+        return cvs    
+
+    except Exception as e:
+        return JSONResponse(status_code=500 , content=str(e))
+    
 

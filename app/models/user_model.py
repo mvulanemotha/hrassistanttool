@@ -138,8 +138,11 @@ class CVToProcess(Base):
 class CVProcessSchema(BaseModel):
     id: int
     user_id: int
-    template_cv: int
     user_cv: str
+    status: str
+    template_cv: int
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True
