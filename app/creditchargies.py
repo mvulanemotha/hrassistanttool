@@ -4,16 +4,8 @@ from app.database.database import SessionLocal
 from app.models.user_model import Credits
 
 CHARGES = {
-    "compare_text": {
-        "description": "Compare plain job description text with CV text",
-        "price": 3
-    },
     "compare_files": {
         "description": "Compare uploaded CV file(s) with job description file",
-        "price": 3
-    },
-    "get_text_reasoning": {
-        "description": "Explain score and provide improvement suggestions",
         "price": 3
     },
     "get_file_reasoning": {
@@ -22,7 +14,7 @@ CHARGES = {
     },
     "generate_cv": {
         "description": "CV generation",
-        "price": 50
+        "price": 60
     }
 }
 
