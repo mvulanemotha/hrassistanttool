@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     libmagic-dev \
     libreoffice \
+    libcairo2 \
+    libcairo2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (Astra's fast package manager)
