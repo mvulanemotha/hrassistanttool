@@ -29,9 +29,12 @@ from app.momopayment import request_to_pay, generate_uuid , update_transactions_
 from app.creditchargies import CHARGES , check_user_units
 import asyncio
 from app.generate_cv import get_available_templates , generate_cv,CVRequest
-
+from sqlalchemy.orm import joinedload
 
 CV_STORAGE_DIR = Path("cv_documents")
+
+USERS_CV_DIR = Path("uploaded_user_cv")
+
 
 app = FastAPI(
     title="HR AI Assistant API",
@@ -517,3 +520,39 @@ def get_cv_progress(user_id:int , db:Session = Depends(get_db)):
         return JSONResponse(status_code=500 , content=str(e))
     
 
+# get count of cvs to be processed
+@app.get("/hrassistantai/cv_to_process_count")
+def get_cv_to_process_count(db: Session = Depends(get_db)):
+    try:
+        count = db.query(CVToProcess).filter(CVToProcess.status == "pending").count()
+        return JSONResponse(status_code=200 , content={"pending_count": count})
+    
+    except Exception as e:
+        return JSONResponse(status_code=500 , content=str(e))
+    
+# get the cvs to process
+@app.get("/hrassistantai/get_cv_to_process" , response_model=List[CVProcessSchema])
+def get_cvs_to_process(db: Session = Depends(get_db)):
+    try:
+        cvs = db.query(CVToProcess).options(joinedload(CVToProcess.user)).all()
+
+        if not cvs:
+            return JSONResponse(status_code=400 , content="No CVs found")
+        
+        # Convert SQLAlchemy objects to Pydantic models
+        return [ CVProcessSchema.from_orm(cv) for cv in cvs]
+    except Exception as e:
+        return JSONResponse(status_code=500 , content=str(e))
+
+# download usercv using the usercv filename
+@app.get("/hrassistantai/download_user_cv/{file_name}")
+def download_user_cv(file_name: str):
+    file_path = USERS_CV_DIR / file_name
+    if not file_path.exists():
+        return JSONResponse(status_code=404 , content="File not found")
+    
+    def iterfile():
+        with open(file_path , mode="rb") as file_like:
+            yield from file_like
+
+    return StreamingResponse(iterfile() , media_type="application/octet-stream" , headers={"Content-Disposition": f"attachment; filename={file_name}"})

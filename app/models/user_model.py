@@ -134,6 +134,21 @@ class CVToProcess(Base):
 # ✅ Pydantic SCHEMAS
 # =============================
 
+# add UserInfo Schema
+class UserInfoSchema(BaseModel):
+    id: int
+    email: EmailStr
+    name: str
+    user: str
+    country: str
+    contact: str
+    created_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+
 #
 class CVProcessSchema(BaseModel):
     id: int
@@ -143,6 +158,7 @@ class CVProcessSchema(BaseModel):
     template_cv: int
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    user: Optional[UserInfoSchema]  # Nested user schema
 
     class Config:
         from_attributes = True
