@@ -603,15 +603,30 @@ def save_processed_cv(user_id: int = Form(...), file: UploadFile = File(...), fi
         return JSONResponse(status_code=500, content=f"Failed to save processed CV: {str(e)}")
         
 
-# download usercv using the usercv filename
-@app.get("/hrassistantai/download_processed_cv/{file_name}")
-def download_user_cv(file_name: str):
-    file_path = PROCESSED_CVS / file_name
-    if not file_path.exists():
-        return JSONResponse(status_code=404 , content="File not found")
+@app.get("/hrassistantai/download_processed_cv/{file_id}")
+def download_user_cv(file_id: int, db: Session = Depends(get_db)):
+    # Query for a processed CV matching the file_id
+    file_record = db.query(CVProcessed).filter(CVProcessed.cv_to_process_id == file_id).first()
+    print(file_record)
+     # If no record found, return 404
+    if not file_record:
+        return JSONResponse(status_code=404, content="File not found in records")
     
+    file_path = PROCESSED_CVS / file_record.processed_cv
+    if not file_path.exists():
+        return JSONResponse(status_code=404, content="File not found on disk")
+    
+    # Use the DB filename for the download
+    file_name = file_record.processed_cv  
+
     def iterfile():
-        with open(file_path , mode="rb") as file_like:
+        with open(file_path, mode="rb") as file_like:
             yield from file_like
 
-    return StreamingResponse(iterfile() , media_type="application/octet-stream" , headers={"Content-Disposition": f"attachment; filename={file_name}"})
+    return StreamingResponse(
+        iterfile(),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_name}"'
+        }
+    )
