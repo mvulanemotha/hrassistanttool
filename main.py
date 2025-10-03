@@ -580,6 +580,7 @@ def save_processed_cv(user_id: int = Form(...), file: UploadFile = File(...), fi
         processed_cv_record = CVProcessed(
             user_id=user_id,
             processed_cv=unique_name,
+            cv_to_process_id = file_id,
             created_at=datetime.utcnow()
         )
 

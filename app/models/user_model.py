@@ -123,26 +123,34 @@ class OTP(Base):
 class CVToProcess(Base):
     __tablename__ = "cv_to_process"
 
-    id = Column(Integer , primary_key=True , index=True)
+    id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     template_cv = Column(Integer, nullable=False) 
     user_cv = Column(String, nullable=False)
-    created_at = Column(DateTime , default=datetime.utcnow)
-    updated_at = Column(DateTime , default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="pending")  # pending, processing, completed, failed 
 
     user = relationship("User", back_populates="cvs_to_process")
 
-# processed cvs
+    # 🔗 One-to-one / one-to-many relationship to processed CVs
+    processed_cvs = relationship("CVProcessed", back_populates="cv_to_process", cascade="all, delete-orphan")
+
+
 class CVProcessed(Base):
     __tablename__ = "cv_processed"
 
-    id = Column(Integer , primary_key=True , index=True)
+    id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    processed_cv = Column(String, nullable=False)
-    created_at = Column(DateTime , default=datetime.utcnow)
 
-    user = relationship("User", back_populates="processed_cvs")  # ✅ back_populates
+    # 🔗 Foreign key back to CVToProcess
+    cv_to_process_id = Column(Integer, ForeignKey("cv_to_process.id", ondelete="CASCADE"), nullable=False)
+
+    processed_cv = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="processed_cvs")
+    cv_to_process = relationship("CVToProcess", back_populates="processed_cvs")
 
 # =============================
 # ✅ Pydantic SCHEMAS
