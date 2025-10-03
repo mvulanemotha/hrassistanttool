@@ -229,7 +229,7 @@ async def explain_low_score(job_description_file: UploadFile = File(...),
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=350,
-                temperature=0.7,
+                temperature=0.5,
             )
 
         response = await run_in_threadpool(sync_openai_call)
