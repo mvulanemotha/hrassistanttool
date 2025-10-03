@@ -16,6 +16,7 @@ services:
       - ./cv_documents:/app/cv_documents
       - ./cv_vectorstore:/app/cv_vectorstore
       - ./uploaded_user_cv:/app/uploaded_user_cv
+      - ./processed_cv:/app/processed_cv
     depends_on:
       - dbb
     networks:

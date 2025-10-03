@@ -27,10 +27,14 @@ class User(Base):
         return f"<User(id={self.id}, email={self.email}, name={self.name})>"
 
     # optional: relationship to match history
-    match_history = relationship("MatchHistory", back_populates="user")
     uploaded_cvs = relationship("UserCVUpload", back_populates="user", cascade="all, delete-orphan")
     credits = relationship("Credits", back_populates="user", cascade="all, delete-orphan")
-    transactions = relationship("Transactions" , back_populates="user")  
+    transactions = relationship("Transactions", back_populates="user")
+    match_history = relationship("MatchHistory", back_populates="user")
+    processed_cvs = relationship("CVProcessed", back_populates="user", cascade="all, delete-orphan")
+    cvs_to_process = relationship("CVToProcess", back_populates="user", cascade="all, delete-orphan")
+    otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
+
 
 class Credits(Base):
     
@@ -113,7 +117,7 @@ class OTP(Base):
     expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=10))
 
     # Relationship
-    user = relationship("User", backref="otps")
+    user = relationship("User", back_populates="otps")
 
 # save uploaded cvs to be proccessed later
 class CVToProcess(Base):
@@ -127,8 +131,18 @@ class CVToProcess(Base):
     updated_at = Column(DateTime , default=datetime.utcnow)
     status = Column(String, default="pending")  # pending, processing, completed, failed 
 
-    user = relationship("User", backref="cvs_to_process")
+    user = relationship("User", back_populates="cvs_to_process")
 
+# processed cvs
+class CVProcessed(Base):
+    __tablename__ = "cv_processed"
+
+    id = Column(Integer , primary_key=True , index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    processed_cv = Column(String, nullable=False)
+    created_at = Column(DateTime , default=datetime.utcnow)
+
+    user = relationship("User", back_populates="processed_cvs")  # ✅ back_populates
 
 # =============================
 # ✅ Pydantic SCHEMAS

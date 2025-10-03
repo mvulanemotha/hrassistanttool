@@ -14,7 +14,7 @@ from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import CVProcessed , CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 from app.services.email import send_email
@@ -34,6 +34,8 @@ from sqlalchemy.orm import joinedload
 CV_STORAGE_DIR = Path("cv_documents")
 
 USERS_CV_DIR = Path("uploaded_user_cv")
+
+PROCESSED_CVS = Path("processed_cv")
 
 
 app = FastAPI(
@@ -548,6 +550,62 @@ def get_cvs_to_process(db: Session = Depends(get_db)):
 @app.get("/hrassistantai/download_user_cv/{file_name}")
 def download_user_cv(file_name: str):
     file_path = USERS_CV_DIR / file_name
+    if not file_path.exists():
+        return JSONResponse(status_code=404 , content="File not found")
+    
+    def iterfile():
+        with open(file_path , mode="rb") as file_like:
+            yield from file_like
+
+    return StreamingResponse(iterfile() , media_type="application/octet-stream" , headers={"Content-Disposition": f"attachment; filename={file_name}"})
+
+
+# save processed cv
+@app.post("/hrassistantai/save_processed_cv")
+def save_processed_cv(user_id: int = Form(...), file: UploadFile = File(...), file_id : int = Form(...) , db:Session = Depends(get_db)):
+    try:
+        # Create processed cv directory if it doesn't exist
+        PROCESSED_CVS.mkdir(parents=True, exist_ok=True)
+
+        # Create a unique filename
+        extension = Path(file.filename).suffix
+        unique_name = f"{user_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex}{extension}"
+        file_location = PROCESSED_CVS / unique_name
+
+        # Save the uploaded file
+        with open(file_location, "wb") as f:
+            f.write(file.file.read())
+
+        # Save reference in DB
+        processed_cv_record = CVProcessed(
+            user_id=user_id,
+            processed_cv=unique_name,
+            created_at=datetime.utcnow()
+        )
+
+        db.add(processed_cv_record)
+
+        # update processed status   
+        cvs = db.query(CVToProcess).filter(CVToProcess.user_id == user_id , CVToProcess.id == file_id).first()
+
+        if cvs:
+            cvs.status = "completed"
+            cvs.updated_at = datetime.utcnow()
+            #db.add(cvs)
+
+        db.commit()
+        db.refresh(processed_cv_record)
+
+        return JSONResponse(status_code=201, content={"message": "Processed CV saved successfully", "file_id": processed_cv_record.id})
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content=f"Failed to save processed CV: {str(e)}")
+        
+
+# download usercv using the usercv filename
+@app.get("/hrassistantai/download_processed_cv/{file_name}")
+def download_user_cv(file_name: str):
+    file_path = PROCESSED_CVS / file_name
     if not file_path.exists():
         return JSONResponse(status_code=404 , content="File not found")
     
