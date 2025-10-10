@@ -18,6 +18,7 @@ from app.models.user_model import CVProcessed , CVProcessSchema, CVToProcess , R
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 from app.services.email import send_email
+from app.jobs_search import search_jobs
 
 from app.utils.auth import create_access_token
 from collections import defaultdict
@@ -31,10 +32,9 @@ import asyncio
 from app.generate_cv import get_available_templates , generate_cv,CVRequest
 from sqlalchemy.orm import joinedload
 
+
 CV_STORAGE_DIR = Path("cv_documents")
-
 USERS_CV_DIR = Path("uploaded_user_cv")
-
 PROCESSED_CVS = Path("processed_cv")
 
 
@@ -630,3 +630,15 @@ def download_user_cv(file_id: int, db: Session = Depends(get_db)):
             "Content-Disposition": f'attachment; filename="{file_name}"'
         }
     )
+
+
+#search for a job
+@app.get("/hrassistantai/search_jobs")
+def search_for_jobs():
+    try:
+        jobs = search_jobs(country = "Eswatini")
+        return JSONResponse(status_code=200, content={"jobs": jobs})
+    except Exception as e:
+        return JSONResponse(status_code=500, content=f"Failed to search jobs: {str(e)}")
+    
+
