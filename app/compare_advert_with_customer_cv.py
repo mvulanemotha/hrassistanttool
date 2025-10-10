@@ -22,7 +22,8 @@ from PIL import Image
 load_dotenv()
 
 #EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-EMBEDDING_MODEL = "intfloat/e5-base-v2"
+#EMBEDDING_MODEL = "intfloat/e5-base-v2"
+EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
 
 ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt", ".doc", ".jpg", ".jpeg", ".png"]
 
@@ -229,7 +230,7 @@ async def explain_low_score(job_description_file: UploadFile = File(...),
             return client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=350,
+                max_tokens=400,
                 temperature=0.5,
             )
 
