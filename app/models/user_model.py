@@ -56,7 +56,7 @@ class Credits(Base):
     __tablename__ = "credits"
 
     id = Column(Integer , primary_key=True , index=True)
-    user_id = Column(Integer , ForeignKey("users.id") , nullable=False)
+    user_id = Column(Integer , ForeignKey("users.id" , ondelete="CASCADE"), nullable=False)
     amount = Column(Float , nullable=False)
     created_at = Column(DateTime , default=datetime.utcnow)
 
