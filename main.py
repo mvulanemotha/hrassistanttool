@@ -73,6 +73,10 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
     if not db_user:
         #raise HTTPException(status_code=400 , detail="User not found")
         return { "status_code" : 400 , "message" : "User not found" }
+    
+    referral_code = None
+    if db_user.referrals and len(db_user.referrals) > 0:
+         referral_code = db_user.referrals[0].referal_code
 
     # verify password
     if not pwd_context.verify(user.password , db_user.password):
@@ -81,7 +85,15 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
   
     # create jwt token
     access_token = create_access_token(data={"sub": db_user.email})
-    return { "access_token" : access_token , "status_code" : 200 , "user_id": db_user.id , "user": db_user.user , "name" : db_user.name , "email": db_user.email } 
+    return { 
+        "access_token" : access_token,
+        "status_code" : 200,
+        "user_id": db_user.id,
+        "user": db_user.user,
+        "name" : db_user.name,
+        "email": db_user.email, 
+        "referral_code" : referral_code
+        } 
 
 # create a new user
 @app.post("/hrassistantai/newuser")

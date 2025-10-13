@@ -42,7 +42,7 @@ class Referals(Base):
     __tablename__ = "referrals"
 
     id = Column(Integer , primary_key=True , index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False) #used as a reference code
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False) #used as a reference code
     referal_code = Column(String , nullable=False)
     created_at = Column(DateTime , default=datetime.utcnow)
    
