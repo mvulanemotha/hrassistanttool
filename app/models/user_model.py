@@ -34,6 +34,21 @@ class User(Base):
     processed_cvs = relationship("CVProcessed", back_populates="user", cascade="all, delete-orphan")
     cvs_to_process = relationship("CVToProcess", back_populates="user", cascade="all, delete-orphan")
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
+    referrals = relationship("Referals", back_populates="user", cascade="all, delete-orphan")
+
+
+class Referals(Base):
+
+    __tablename__ = "referrals"
+
+    id = Column(Integer , primary_key=True , index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False) #used as a reference code
+    referal_code = Column(String , nullable=False)
+    created_at = Column(DateTime , default=datetime.utcnow)
+   
+
+    #relationship to user
+    user = relationship("User" , back_populates="referrals")
 
 
 class Credits(Base):
@@ -199,6 +214,7 @@ class UserCreate(BaseModel):
     user: str
     country: str
     contact: str
+    referal_code: str
 
     @field_validator('contact')
     def validate_contact(cls, v):

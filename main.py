@@ -1,7 +1,6 @@
 from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query , BackgroundTasks , Form
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import io
 import uuid
 from typing import List , Dict, Any
 from fastapi.responses import JSONResponse , StreamingResponse
@@ -14,7 +13,7 @@ from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import CVProcessed , CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import Referals ,  CVProcessed , CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 from app.services.email import send_email
@@ -25,12 +24,13 @@ from collections import defaultdict
 import zipfile
 from io import BytesIO
 from pathlib import Path
-import base64
 from app.momopayment import request_to_pay, generate_uuid , update_transactions_credits_periodically 
 from app.creditchargies import CHARGES , check_user_units
 import asyncio
 from app.generate_cv import get_available_templates , generate_cv,CVRequest
 from sqlalchemy.orm import joinedload
+import random
+import string
 
 
 CV_STORAGE_DIR = Path("cv_documents")
@@ -103,8 +103,17 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
 
         # Add to DB and commit
         db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
+        db.flush()
+
+        #add new user referal code
+        six_digit = ''.join(random.choices(string.digits, k=6)) 
+
+        add_referal = Referals(
+            user_id = db_user.id,
+            referal_code = six_digit
+        )
+
+        db.add(add_referal)
 
         #assign credits to new user user
         initial_credits = Credits(
@@ -114,7 +123,19 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
         )
 
         db.add(initial_credits)
+
+        #check if referal was used
+        if user.referal_code:
+            myreferals = db.query(Referals).filter(Referals.referal_code == user.referal_code).first()
+            
+            if myreferals:
+                referrer_credits = db.query(Credits).filter(Credits.user_id == myreferals.user_id).first()
+                if referrer_credits:
+                    #updates credits
+                    referrer_credits.amount += 10
+
         db.commit()
+        db.refresh(db_user)
     
         return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 , "user":db_user.user , "credits": initial_credits.amount }
     except ValidationError as e:
@@ -126,6 +147,7 @@ def create_user(user:UserCreate , db:Session = Depends(get_db)):
         }
     except Exception as e:
         # Handle other unexpected errors
+        print(e)
         return {
             "status_code": 500,
             "message": "Internal server error",
