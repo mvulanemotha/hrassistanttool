@@ -1,32 +1,27 @@
 from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from datetime import datetime , timedelta
+from datetime import datetime, timedelta
 from app.database.database import Base
-from pydantic import BaseModel, EmailStr , constr , field_validator
-from typing import List, Optional 
+from pydantic import BaseModel, EmailStr, constr, field_validator
+from typing import List, Optional
 
 # =============================
 # ✅ SQLAlchemy MODELS
 # =============================
 
 class User(Base):
-    
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
-    password = Column(String , nullable=False)  # hashed password
-    name = Column(String , nullable=False)
-    user = Column(String , nullable=False)
-    country = Column(String , nullable=False)
-    contact = Column(String , nullable=False)
+    password = Column(String, nullable=False)  # hashed password
+    name = Column(String, nullable=False)
+    user = Column(String, nullable=False)
+    country = Column(String, nullable=False)
+    contact = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    created_at = Column(DateTime , default=datetime.utcnow)
-   
-    def __repr__(self):
-        return f"<User(id={self.id}, email={self.email}, name={self.name})>"
-
-    # optional: relationship to match history
+    # Relationships
     uploaded_cvs = relationship("UserCVUpload", back_populates="user", cascade="all, delete-orphan")
     credits = relationship("Credits", back_populates="user", cascade="all, delete-orphan")
     transactions = relationship("Transactions", back_populates="user")
@@ -36,119 +31,124 @@ class User(Base):
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
     referrals = relationship("Referals", back_populates="user", cascade="all, delete-orphan")
 
+    def __repr__(self):
+        return f"<User(id={self.id}, email={self.email}, name={self.name})>"
+
 
 class Referals(Base):
-
     __tablename__ = "referrals"
 
-    id = Column(Integer , primary_key=True , index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False) #used as a reference code
-    referal_code = Column(String , nullable=False)
-    created_at = Column(DateTime , default=datetime.utcnow)
-   
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    referral_code = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    #relationship to user
-    user = relationship("User" , back_populates="referrals")
+    # Relationships
+    user = relationship("User", back_populates="referrals")
+    referral_links = relationship("ReferralLink", back_populates="referral", cascade="all, delete-orphan")
+
+
+class ReferralLink(Base):
+    __tablename__ = "referral_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    referral_id = Column(Integer, ForeignKey("referrals.id", ondelete="CASCADE"), nullable=False)
+    referred_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    referral = relationship("Referals", back_populates="referral_links")
+    referred_user = relationship("User")  # Optional: add back_populates if needed
 
 
 class Credits(Base):
-    
     __tablename__ = "credits"
 
-    id = Column(Integer , primary_key=True , index=True)
-    user_id = Column(Integer , ForeignKey("users.id" , ondelete="CASCADE"), nullable=False)
-    amount = Column(Float , nullable=False)
-    created_at = Column(DateTime , default=datetime.utcnow)
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    #relationship to user
-    user = relationship("User" , back_populates="credits")
+    user = relationship("User", back_populates="credits")
+
 
 class Transactions(Base):
-    
     __tablename__ = "transactions"
 
-    id = Column(Integer , primary_key=True , index=True)
-    user_id = Column(Integer,ForeignKey("users.id") , nullable=False)
-    reference_id = Column(String , nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reference_id = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
-    status = Column(Integer, default=0 , nullable=False)
-    created_at = Column(DateTime , default=datetime.utcnow ,nullable=False)
+    status = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    #Relationshsip
-    user = relationship("User" , back_populates="transactions")
-    
+    user = relationship("User", back_populates="transactions")
 
 
 class MatchHistory(Base):
     __tablename__ = "match_history"
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     job_description = Column(Text, nullable=False)
-    job_title = Column(String, nullable=False)  # ✅ Add this line
-
+    job_title = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # relationships
     user = relationship("User", back_populates="match_history")
     results = relationship("MatchResult", back_populates="history", cascade="all, delete-orphan")
 
 
-
 class MatchResult(Base):
     __tablename__ = "match_results"
+
     id = Column(Integer, primary_key=True, index=True)
     history_id = Column(Integer, ForeignKey("match_history.id", ondelete="CASCADE"))
     file_name = Column(String(255), nullable=False)
     score = Column(Float, nullable=False)
     matched_content = Column(Text)
-
-    created_at = Column(DateTime , default=datetime.utcnow)
-    updated_at = Column(DateTime , default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     history = relationship("MatchHistory", back_populates="results")
+
 
 class UserCVUpload(Base):
     __tablename__ = "user_cvs"
 
-    id = Column(Integer , primary_key=True , index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete = "CASCADE"))
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     file_name = Column(String, nullable=False)
-    job_title = Column(String , nullable=False)
-
-    created_at = Column(DateTime , default=datetime.utcnow)
+    job_title = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
-    #optional: relationship to User
     user = relationship("User", back_populates="uploaded_cvs")
+
 
 class OTP(Base):
     __tablename__ = "otps"
-    
-    id = Column(Integer , primary_key=True , index=True)
+
+    id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    otp_code = Column(String(6), nullable=False)  # 4-digit OTP
+    otp_code = Column(String(6), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=10))
 
-    # Relationship
     user = relationship("User", back_populates="otps")
 
-# save uploaded cvs to be proccessed later
+
 class CVToProcess(Base):
     __tablename__ = "cv_to_process"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    template_cv = Column(Integer, nullable=False) 
+    template_cv = Column(Integer, nullable=False)
     user_cv = Column(String, nullable=False)
+    status = Column(String, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-    status = Column(String, default="pending")  # pending, processing, completed, failed 
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="cvs_to_process")
-
-    # 🔗 One-to-one / one-to-many relationship to processed CVs
     processed_cvs = relationship("CVProcessed", back_populates="cv_to_process", cascade="all, delete-orphan")
 
 
@@ -157,21 +157,18 @@ class CVProcessed(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-
-    # 🔗 Foreign key back to CVToProcess
     cv_to_process_id = Column(Integer, ForeignKey("cv_to_process.id", ondelete="CASCADE"), nullable=False)
-
     processed_cv = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="processed_cvs")
     cv_to_process = relationship("CVToProcess", back_populates="processed_cvs")
 
-# =============================
-# ✅ Pydantic SCHEMAS
-# =============================
 
-# add UserInfo Schema
+# ------------------------------
+# User-related Schemas
+# ------------------------------
+
 class UserInfoSchema(BaseModel):
     id: int
     email: EmailStr
@@ -185,8 +182,33 @@ class UserInfoSchema(BaseModel):
         from_attributes = True
 
 
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
-#
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    user: str
+    country: str
+    contact: str
+    referral_code: str
+
+    @field_validator('contact')
+    def validate_contact(cls, v):
+        import re
+        pattern = r"^\+\d{1,4}\d{6,14}$"
+        if not re.match(pattern, v):
+            raise ValueError("Contact must be in the format: +<country code><number>")
+        return v
+
+
+# ------------------------------
+# CV Processing Schemas
+# ------------------------------
+
 class CVProcessSchema(BaseModel):
     id: int
     user_id: int
@@ -201,32 +223,8 @@ class CVProcessSchema(BaseModel):
         from_attributes = True
 
 
-# Login model class
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-# User creation input
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    name: str
-    user: str
-    country: str
-    contact: str
-    referal_code: str
-
-    @field_validator('contact')
-    def validate_contact(cls, v):
-       import re
-       pattern = r"^\+\d{1,4}\d{6,14}$"
-       if not re.match(pattern, v):
-           raise ValueError("Contact must be in the format: +<country code><number>")
-       return v
-
-
 # ------------------------------
-# Match history/result schemas
+# Match History / Result Schemas
 # ------------------------------
 
 class MatchResultSchema(BaseModel):
@@ -237,11 +235,12 @@ class MatchResultSchema(BaseModel):
     class Config:
         from_attributes = True
 
+
 class MatchHistorySchema(BaseModel):
     id: int
     user_id: int
     job_description: str
-    job_title: str  # ✅ Add this line
+    job_title: str
     created_at: datetime
     results: List[MatchResultSchema] = []
 
@@ -251,35 +250,39 @@ class MatchHistorySchema(BaseModel):
 
 class SaveMatchesRequest(BaseModel):
     user_id: int
-    jobDescription: str # match frontend key
-    job_title: str  # ✅ Add this line
+    jobDescription: str  # match frontend key
+    job_title: str
     matchedCandidates: List[MatchResultSchema]
 
-class UserCVSchema(BaseModel):
 
-    id : int
-    user_id : int
-    job_title : str
-    file_name : str
-    created_at : datetime
+class UserCVSchema(BaseModel):
+    id: int
+    user_id: int
+    job_title: str
+    file_name: str
+    created_at: datetime
 
     model_config = {
         "from_attributes": True
     }
 
 
+# ------------------------------
+# Credit / Payment Schemas
+# ------------------------------
+
 class CreditSchema(BaseModel):
-    id:int
-    user_id:int
+    id: int
+    user_id: int
     amount: float
     created_at: datetime
 
     class Config:
-        form_attributes = True
+        from_attributes = True
 
 
 class AddCreditRequest(BaseModel):
-    user_id:int
+    user_id: int
     amount: int
 
 
@@ -288,18 +291,25 @@ class RequestToPay(BaseModel):
     msisdn: str
     user_id: int
 
+
+# ------------------------------
+# Miscellaneous Requests
+# ------------------------------
+
 class LowScoreRequest(BaseModel):
     job_description: str
     cv_text: str
-    required_units:int
-    user_id:int
+    required_units: int
+    user_id: int
+
 
 class VerifyOtpRequest(BaseModel):
-    email : EmailStr
-    otp : str
-    password : str
+    email: EmailStr
+    otp: str
+    password: str
+
 
 class ResetPasswordRequest(BaseModel):
-    user_id : int
+    user_id: int
     otp: str
-    password : str
+    password: str

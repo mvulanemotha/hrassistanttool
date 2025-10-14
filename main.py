@@ -13,7 +13,7 @@ from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import Referals ,  CVProcessed , CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import ReferralLink,  Referals ,  CVProcessed , CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 from app.services.email import send_email
@@ -76,7 +76,7 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
     
     referral_code = None
     if db_user.referrals and len(db_user.referrals) > 0:
-         referral_code = db_user.referrals[0].referal_code
+         referral_code = db_user.referrals[0].referral_code
 
     # verify password
     if not pwd_context.verify(user.password , db_user.password):
@@ -97,74 +97,97 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
 
 # create a new user
 @app.post("/hrassistantai/newuser")
-def create_user(user:UserCreate , db:Session = Depends(get_db)):
-    """ 
-    create a new user
-    """
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+
+    """Create a new user with optional referral code"""
+
     try:
-        # check if user exists
+        # Check if user already exists
         existing_user = db.query(User).filter(User.email == user.email).first()
         if existing_user:
-            #raise HTTPException(status_code=400, detail="Email already registered")
-            return { "status_code" : 400 , "message" : "Email already registered" }
+            return {"status_code": 400, "message": "Email already registered"}
+
         # Hash the password
         hashed_password = pwd_context.hash(user.password)
-        print(user.user)
-        #Create new user object
-        db_user = User(email=user.email, password=hashed_password , name=user.name , user=user.user , country=user.country , contact=user.contact )
 
-        # Add to DB and commit
-        db.add(db_user)
-        db.flush()
-
-        #add new user referal code
-        six_digit = ''.join(random.choices(string.digits, k=6)) 
-
-        add_referal = Referals(
-            user_id = db_user.id,
-            referal_code = six_digit
+        # Create new user
+        db_user = User(
+            email=user.email,
+            password=hashed_password,
+            name=user.name,
+            user=user.user,
+            country=user.country,
+            contact=user.contact
         )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
 
-        db.add(add_referal)
+        # Generate unique 6-digit referral code
+        while True:
+            six_digit = ''.join(random.choices(string.digits, k=6))
+            existing_code = db.query(Referals).filter(Referals.referral_code == six_digit).first()
+            if not existing_code:
+                break
 
-        #assign credits to new user user
+        # Add referral entry for new user
+        new_referral = Referals(
+            user_id=db_user.id,
+            referral_code=six_digit
+        )
+        db.add(new_referral)
+
+        # Assign initial credits
         initial_credits = Credits(
             user_id=db_user.id,
             amount=15,
             created_at=datetime.utcnow()
         )
-
         db.add(initial_credits)
 
-        #check if referal was used
-        if user.referal_code:
-            myreferals = db.query(Referals).filter(Referals.referal_code == user.referal_code).first()
-            
-            if myreferals:
-                referrer_credits = db.query(Credits).filter(Credits.user_id == myreferals.user_id).first()
+        # Handle referral code if provided
+        if user.referral_code:
+            referrer = db.query(Referals).filter(Referals.referral_code == user.referral_code).first()
+            if referrer:
+                # Update referrer credits
+                referrer_credits = db.query(Credits).filter(Credits.user_id == referrer.user_id).first()
                 if referrer_credits:
-                    #updates credits
                     referrer_credits.amount += 10
+
+                # Create referral link
+                referral_link = ReferralLink(
+                    referral_id=referrer.id,
+                    referred_user_id=db_user.id
+                )
+                db.add(referral_link)
 
         db.commit()
         db.refresh(db_user)
-    
-        return { "id":db_user.id , "email": db_user.email , "name": db_user.name , "status_code" : 201 , "user":db_user.user , "credits": initial_credits.amount }
+
+        return {
+            "id": db_user.id,
+            "email": db_user.email,
+            "name": db_user.name,
+            "user": db_user.user,
+            "credits": initial_credits.amount,
+            "status_code": 201
+        }
+
     except ValidationError as e:
-        # Handle Pydantic validation errors
+        print(e)
         return {
             "status_code": 422,
             "message": "Validation error",
-            "detail": e.errors()  # Provides specific validation error details
+            "detail": e.errors()
         }
     except Exception as e:
-        # Handle other unexpected errors
         print(e)
         return {
             "status_code": 500,
             "message": "Internal server error",
             "detail": str(e)
         }
+
 
 @app.post("/hrassistantai/upload_cv_embed")
 #call function to upload files
@@ -676,3 +699,44 @@ def search_for_jobs():
         return JSONResponse(status_code=500, content=f"Failed to search jobs: {str(e)}")
     
 
+#get referrals
+@app.get("/hrassistantai/referrals/{user_id}")
+def get_user_referrals(user_id: int, db: Session = Depends(get_db)):
+    """
+    Get all users referred by a given user
+    """
+    # Step 1: Find the referral record for this user
+    referral = db.query(Referals).filter(Referals.user_id == user_id).first()
+    if not referral:
+        raise HTTPException(status_code=404, detail="User has no referral record.")
+
+    # Step 2: Find all referral links linked to that referral ID
+    referral_links = (
+        db.query(ReferralLink)
+        .filter(ReferralLink.referral_id == referral.id)
+        .all()
+    )
+
+    if not referral_links:
+        return JSONResponse(status_code=404, content={"message": "No referred users found."})
+
+    # Step 3: Get details of the referred users
+    referred_users = (
+        db.query(User)
+        .filter(User.id.in_([link.referred_user_id for link in referral_links]))
+        .all()
+    )
+
+    result = [
+        {
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "country": u.country,
+            "contact": u.contact,
+            "created_at": u.created_at.isoformat() if u.created_at else None,  # Convert datetime to ISO string
+        }
+        for u in referred_users
+    ]
+
+    return JSONResponse(status_code=200, content=result)
