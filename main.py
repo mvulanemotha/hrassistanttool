@@ -13,7 +13,7 @@ from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
-from app.models.user_model import ReferralLink,  Referals ,  CVProcessed , CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
+from app.models.user_model import UserInfoSchema ,  ReferralLink,  Referals ,  CVProcessed , CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
 from app.services.email import send_email
@@ -740,3 +740,18 @@ def get_user_referrals(user_id: int, db: Session = Depends(get_db)):
     ]
 
     return JSONResponse(status_code=200, content=result)
+
+
+# Get all customers 
+@app.get("/hrassistantai/users" , response_model=List[UserInfoSchema])
+def get_all_users(db: Session = Depends(get_db)):
+    """ get all users of the application """
+
+    try:
+        users = db.query(User).all()
+
+        return users
+         
+
+    except Exception as e:
+        return JSONResponse(status_code=500 , content={e})
