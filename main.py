@@ -16,7 +16,7 @@ from app.database.database import SessionLocal
 from app.models.user_model import UserInfoSchema ,  ReferralLink,  Referals ,  CVProcessed , CVProcessSchema, CVToProcess , ResetPasswordRequest , OTP, Transactions , LowScoreRequest , RequestToPay, User, Credits , UserCVUpload , AddCreditRequest ,UserCVSchema, CreditSchema , UserLogin , UserCreate , MatchHistory , MatchResult , UserCVUpload , MatchHistorySchema, SaveMatchesRequest
 from app.cv_generator import *
 from app.services.payment import create_payment_intent
-from app.services.email import send_email
+from app.services.email import send_email , send_cv_email
 from app.jobs_search import search_jobs
 from app.create_water_mark import add_watermark_to_pdf
 
@@ -608,6 +608,8 @@ def reset_password(payload: ResetPasswordRequest , db: Session = Depends(get_db)
     
     return JSONResponse(status_code=400 , content="User not found")
 
+
+
 @app.get("/hrassistantai/cv_progress" , response_model=List[CVProcessSchema])
 def get_cv_progress(user_id:int , db:Session = Depends(get_db)):
     
@@ -698,6 +700,12 @@ def save_processed_cv(user_id: int = Form(...), file: UploadFile = File(...), fi
         db.commit()
         db.refresh(processed_cv_record)
 
+        #send email to user indicating that cv has been processed
+        user_db = db.query(User).filter(User.id == user_id).first()
+
+        if user_db:
+            send_cv_email(user_db.email) 
+         
         return JSONResponse(status_code=201, content={"message": "Processed CV saved successfully", "file_id": processed_cv_record.id})
 
     except Exception as e:

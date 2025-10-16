@@ -14,7 +14,7 @@ CHARGES = {
     },
     "generate_cv": {
         "description": "CV generation",
-        "price": 60
+        "price": 70
     }
 }
 

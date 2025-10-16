@@ -44,3 +44,36 @@ def send_email(email):
         print("❌ Error:", e)
 
     return otp
+
+
+#function to sending email to processed cv
+
+def send_cv_email(email):
+    # Create email
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+    msg["To"] = email
+    msg["Subject"] = "Your CV has been processed"
+
+    body = (
+        f"Hello,\n\n"
+        f"Your CV has been successfully processed.\n"
+        f"If you did not request this, please ignore this email.\n\n"
+        f"Thank you,\nHireAI Team"
+    )
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        # Connect to Gmail SMTP
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+
+        # Send email
+        server.sendmail(sender_email,email, msg.as_string())
+        print(f"✅ Email sent to {email}")
+
+        server.quit()
+
+    except Exception as e:
+        print("❌ Error sending email:", e)

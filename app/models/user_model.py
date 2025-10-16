@@ -160,7 +160,7 @@ class CVProcessed(Base):
     cv_to_process_id = Column(Integer, ForeignKey("cv_to_process.id", ondelete="CASCADE"), nullable=False)
     processed_cv = Column(String, nullable=False)
     downloaded = Column(Boolean, default=False)
-    email_sent = Column(Boolean ,default=False)
+    #email_sent = Column(Boolean ,default=False)
    
     created_at = Column(DateTime, default=datetime.utcnow)
     
