@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, DateTime ,Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
 from app.database.database import Base
@@ -159,8 +159,11 @@ class CVProcessed(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     cv_to_process_id = Column(Integer, ForeignKey("cv_to_process.id", ondelete="CASCADE"), nullable=False)
     processed_cv = Column(String, nullable=False)
+    downloaded = Column(Boolean, default=False)
+    email_sent = Column(Boolean ,default=False)
+   
     created_at = Column(DateTime, default=datetime.utcnow)
-
+    
     user = relationship("User", back_populates="processed_cvs")
     cv_to_process = relationship("CVToProcess", back_populates="processed_cvs")
 

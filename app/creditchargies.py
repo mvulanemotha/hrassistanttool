@@ -33,11 +33,9 @@ def check_user_units(user_id: int , required_units: int = 1, db: Session = Depen
     credit_record = db.query(Credits).filter(Credits.user_id == user_id).first()
 
     if not credit_record or credit_record.amount < required_units:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail= "Insufficient units to perform this action"
-        )
-    
+        
+        return False
+        
     # subtracting the units in the database before processing
     credit_record.amount -= required_units
     db.commit()

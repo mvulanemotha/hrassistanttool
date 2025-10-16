@@ -1,4 +1,4 @@
-from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query , BackgroundTasks , Form
+from fastapi import FastAPI , UploadFile, File ,Depends ,HTTPException, Query , BackgroundTasks , Form , status
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uuid
@@ -18,6 +18,7 @@ from app.cv_generator import *
 from app.services.payment import create_payment_intent
 from app.services.email import send_email
 from app.jobs_search import search_jobs
+from app.create_water_mark import add_watermark_to_pdf
 
 from app.utils.auth import create_access_token
 from collections import defaultdict
@@ -27,7 +28,7 @@ from pathlib import Path
 from app.momopayment import request_to_pay, generate_uuid , update_transactions_credits_periodically 
 from app.creditchargies import CHARGES , check_user_units
 import asyncio
-from app.generate_cv import get_available_templates , generate_cv,CVRequest
+from app.generate_cv import CVRequest
 from sqlalchemy.orm import joinedload
 import random
 import string
@@ -68,23 +69,35 @@ def get_db():
 @app.post("/hrassistantai/login" , status_code=200)
 def login(user: UserLogin, db:Session = Depends(get_db)):   
     print("🚀 Login endpoint CALLED!", flush=True)
+    
     db_user = db.query(User).filter(User.email == user.email).first()
+   
     print(f"User Details: {db_user}", flush=True)
+
     if not db_user:
         #raise HTTPException(status_code=400 , detail="User not found")
         return { "status_code" : 400 , "message" : "User not found" }
     
     referral_code = None
+   
     if db_user.referrals and len(db_user.referrals) > 0:
          referral_code = db_user.referrals[0].referral_code
 
     # verify password
     if not pwd_context.verify(user.password , db_user.password):
-        #raise HTTPException(status_code=400 , detail="Invalid email or password")
-        return { "status_code" : 400 , "message" : "User not found" }
+        raise HTTPException(status_code=400 , detail="Invalid email or password")
+        
+    #check if any cv has been processed
+    processed_cv = db.query(CVProcessed).filter(CVProcessed.user_id == db_user.id , CVProcessed.downloaded == False).first()
+
+    new_cv = False
+
+    if processed_cv:
+        new_cv = True
   
     # create jwt token
     access_token = create_access_token(data={"sub": db_user.email})
+
     return { 
         "access_token" : access_token,
         "status_code" : 200,
@@ -92,8 +105,9 @@ def login(user: UserLogin, db:Session = Depends(get_db)):
         "user": db_user.user,
         "name" : db_user.name,
         "email": db_user.email, 
-        "referral_code" : referral_code
-        } 
+        "referral_code" : referral_code,
+        "new_cv": new_cv
+    } 
 
 # create a new user
 @app.post("/hrassistantai/newuser")
@@ -332,7 +346,6 @@ def getMatched_cvs(match_id:int , db: Session = Depends(get_db)):
 
     zip_stream.seek(0)
 
-
     return StreamingResponse(
         zip_stream,
         media_type="application/zip",
@@ -346,8 +359,17 @@ def compare_cv_job_description_text(
     cv_text: str = Query(...),
     user_id: int = Query(...),
     required_units: int = Query(...),
-    allowed: bool = Depends(check_user_units)
+    db: Session = Depends(get_db)
 ):
+
+    available_units = check_user_units(user_id=user_id,required_units=required_units , db=db)
+
+    if not available_units:
+         raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail= "Insufficient units to perform this action"
+        )
+
     # You can still reuse your CompareRequest model internally if you want
     payload = CompareRequest(job_description=job_description, cv_text=cv_text)
     return compare_texts(payload)
@@ -359,7 +381,13 @@ async def compare_advert_cv(job_description_file: UploadFile = File(...) , cv_fi
                             db: Session = Depends(get_db)
                              ):
     
-    check_user_units(user_id,required_units , db)
+    available_units = check_user_units(user_id,required_units , db)
+
+    if not available_units:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail= "Insufficient units to perform this action"
+        )
 
     return await compare_documents(job_description_file , cv_file) 
 
@@ -399,7 +427,15 @@ async def generate_low_score_reason(job_description_file: UploadFile = File(...)
                                     user_id: int = Form(...),
                                     required_units: int = Form(...),
                                     db: Session = Depends(get_db)):
-    check_user_units(user_id,required_units,db)
+    available_units = check_user_units(user_id,required_units,db)
+
+    if not available_units:
+         raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail= "Insufficient units to perform this action"
+        )
+    
+
     return await explain_low_score(job_description_file , cv_file)
 
 
@@ -408,11 +444,19 @@ async def generate_low_score_reason(job_description_file: UploadFile = File(...)
 async def low_score_reason(data: LowScoreRequest, db: Session = Depends(get_db) ):
     
     #Manually check units for this request
-    check_user_units(
+    available_units = check_user_units(
         user_id=data.user_id,
         required_units=data.required_units,
         db=db
     )
+
+    if not available_units:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail= "Insufficient units to perform this action"
+        )
+
+
     return await explain_low_score_in_text(data.job_description , data.cv_text)
 
 
@@ -660,11 +704,12 @@ def save_processed_cv(user_id: int = Form(...), file: UploadFile = File(...), fi
         return JSONResponse(status_code=500, content=f"Failed to save processed CV: {str(e)}")
         
 
-@app.get("/hrassistantai/download_processed_cv/{file_id}")
-def download_user_cv(file_id: int, db: Session = Depends(get_db)):
+@app.get("/hrassistantai/download_processed_cv/{file_id}/{user_id}")
+def download_user_cv(file_id: int, user_id: int, db: Session = Depends(get_db)):
     # Query for a processed CV matching the file_id
     file_record = db.query(CVProcessed).filter(CVProcessed.cv_to_process_id == file_id).first()
     print(file_record)
+
      # If no record found, return 404
     if not file_record:
         return JSONResponse(status_code=404, content="File not found in records")
@@ -676,6 +721,27 @@ def download_user_cv(file_id: int, db: Session = Depends(get_db)):
     # Use the DB filename for the download
     file_name = file_record.processed_cv  
 
+    if not file_record.downloaded:
+        
+        # check if if units are enough
+        enough_units = check_user_units( user_id=user_id, required_units=70,db=db)
+
+        if not enough_units:
+            print("Adding Watermark: Insufficient Units")
+            watermarked_pdf = add_watermark_to_pdf(file_path , "INSUFFICIENT UNITS")
+
+            return StreamingResponse(
+                watermarked_pdf,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{file_record.processed_cv}"'}
+            )
+
+    #update status of cv has been downloaded to 
+
+    file_record.downloaded = True
+    db.commit()
+
+    # 5. Stream the original file if downloaded or has enough units
     def iterfile():
         with open(file_path, mode="rb") as file_like:
             yield from file_like
@@ -749,9 +815,7 @@ def get_all_users(db: Session = Depends(get_db)):
 
     try:
         users = db.query(User).all()
-
         return users
          
-
     except Exception as e:
         return JSONResponse(status_code=500 , content={e})
