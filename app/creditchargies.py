@@ -5,15 +5,15 @@ from app.models.user_model import Credits
 
 CHARGES = {
     "compare_files": {
-        "description": "Compare uploaded CV file(s) with job description file",
+        "description": "Comparing your CV with a job advert.",
         "price": 3
     },
     "get_file_reasoning": {
-        "description": "Provide reasoning and improvement tips from files",
+        "description": "Provide reasoning and improvement tips.",
         "price": 4
     },
     "generate_cv": {
-        "description": "CV generation",
+        "description": "CV generation.",
         "price": 70
     }
 }
