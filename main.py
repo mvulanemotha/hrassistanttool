@@ -166,7 +166,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
                 # Update referrer credits
                 referrer_credits = db.query(Credits).filter(Credits.user_id == referrer.user_id).first()
                 if referrer_credits:
-                    referrer_credits.amount += 10
+                    referrer_credits.amount += 7
 
                 # Create referral link
                 referral_link = ReferralLink(

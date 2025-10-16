@@ -6,11 +6,11 @@ from app.models.user_model import Credits
 CHARGES = {
     "compare_files": {
         "description": "Comparing your CV with a job advert.",
-        "price": 3
+        "price": 2
     },
     "get_file_reasoning": {
         "description": "Provide reasoning and improvement tips.",
-        "price": 4
+        "price": 3
     },
     "generate_cv": {
         "description": "CV generation.",
