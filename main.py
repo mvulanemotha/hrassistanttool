@@ -40,7 +40,7 @@ PROCESSED_CVS = Path("processed_cv")
 
 
 app = FastAPI(
-    title="HR AI Assistant API",
+    title="HireAI API",
     description="Upload CVs, embed them, and compare against job description",
     version="1.0.1"
 )
@@ -52,6 +52,14 @@ app.add_middleware(
     allow_methods=["*"],       # ✅ allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],       # ✅ allow all headers
 ) 
+
+# Only embed if the vector store doesn't exist
+if not os.listdir(VECTOR_DB_PATH):
+    print("⚙️ No existing vector store found. Creating embeddings once...")
+    embed_folder(INPUT_FOLDER, VECTOR_DB_PATH)
+else:
+    print("✅ Existing vector store found. Skipping embedding.")
+
 
 #password hashing
 pwd_context = CryptContext(schemes=["bcrypt"] , deprecated="auto")

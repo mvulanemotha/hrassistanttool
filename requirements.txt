@@ -47,3 +47,5 @@ pytesseract
 pyyaml
 rendercv[full]
 alembic
+psycopg2-binary 
+sqlalchemy-pgvector
