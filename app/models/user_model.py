@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 from app.database.database import Base
 from pydantic import BaseModel, EmailStr, constr, field_validator
 from typing import List, Optional
-from sqlalchemy_pgvector import Vector
-
 
 # =============================
 # ✅ SQLAlchemy MODELS
@@ -36,15 +34,6 @@ class User(Base):
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, name={self.name})>"
 
-class HRCVEmbedding(Base):
-    __tablename__ = "hr_cv_embeddings"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    file_name = Column(String, nullable=False)
-    embedding = Column(Vector(1536))  # matches your embedding size
-
-    user = relationship("User", back_populates="hr_cv_embeddings")
 
 class Referals(Base):
     __tablename__ = "referrals"

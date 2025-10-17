@@ -1,14 +1,12 @@
-# Use official Python base image
+# Use an official python base Image
 FROM python:3.11-slim
 
-# Set working directory
+# Set the working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies, including LibreOffice
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    python3-dev \
-    libpq-dev \
     git \
     tesseract-ocr \
     libtesseract-dev \
@@ -21,23 +19,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
-RUN pip install --upgrade pip
+# Install uv (Astra's fast package manager)
+RUN pip install uv
 
-# Copy dependency files
+# Copy project files
 COPY pyproject.toml uv.lock* requirements.txt* ./
 
-# Install Python dependencies from requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies with uv
+RUN uv pip install --system -r requirements.txt
 
-# Install sqlalchemy-pgvector from GitHub (works with Python 3.11)
-RUN pip install --no-cache-dir git+https://github.com/pgvector/sqlalchemy-pgvector.git
-
-# Copy your application code
+# Now copy my actual python code
 COPY . .
 
-# Expose the application port
+# Expose the port the app is running on
 EXPOSE 8000
 
-# Run the application
+# Use uvicorn as your server
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
