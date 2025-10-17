@@ -1,1 +1,44 @@
-3.13
+# Use an official Python 3.11 slim image
+FROM python:3.11-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Install system dependencies for building Python packages and your tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    tesseract-ocr \
+    libtesseract-dev \
+    libleptonica-dev \
+    pkg-config \
+    poppler-utils \
+    libmagic-dev \
+    libreoffice \
+    libcairo2 \
+    libcairo2-dev \
+    python3-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# Copy project dependency files
+COPY pyproject.toml uv.lock* requirements.txt* ./
+
+# Install all requirements except sqlalchemy-pgvector
+RUN grep -v "sqlalchemy-pgvector" requirements.txt > req_no_pgvector.txt \
+    && pip install --no-cache-dir -r req_no_pgvector.txt
+
+# Install sqlalchemy-pgvector directly from GitHub (Python 3.11 compatible)
+RUN pip install --no-cache-dir git+https://github.com/pgvector/sqlalchemy-pgvector.git
+
+# Copy your actual Python code
+COPY . .
+
+# Expose the port your app runs on
+EXPOSE 8000
+
+# Run the app with uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
