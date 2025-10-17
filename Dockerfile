@@ -4,7 +4,7 @@ FROM python:3.11-slim
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies, including LibreOffice
+# Install system dependencies, including LibreOffice and build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
@@ -19,20 +19,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv (Astra's fast package manager)
-RUN pip install uv
+# Upgrade pip
+RUN pip install --upgrade pip
 
-# Copy project files
+# Copy project dependency files
 COPY pyproject.toml uv.lock* requirements.txt* ./
 
-# Install dependencies with uv
-RUN uv pip install --system -r requirements.txt
+# Install dependencies using pip (not uv)
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Now copy my actual python code
+# If sqlalchemy-pgvector fails from PyPI, install from GitHub
+# RUN pip install --no-cache-dir git+https://github.com/pgvector/sqlalchemy-pgvector.git
+
+# Copy your actual Python code
 COPY . .
 
 # Expose the port the app is running on
 EXPOSE 8000
 
-# Use uvicorn as your server
+# Run the app with uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
