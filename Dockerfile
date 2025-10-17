@@ -27,17 +27,17 @@ RUN pip install --upgrade pip
 # Copy dependency files
 COPY pyproject.toml uv.lock* requirements.txt* ./
 
-# Install Python dependencies
+# Install Python dependencies from requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install sqlalchemy-pgvector directly from GitHub
+# Install sqlalchemy-pgvector from GitHub (works with Python 3.11)
 RUN pip install --no-cache-dir git+https://github.com/pgvector/sqlalchemy-pgvector.git
 
-# Copy the source code
+# Copy your application code
 COPY . .
 
-# Expose the port
+# Expose the application port
 EXPOSE 8000
 
-# Run the app
+# Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
