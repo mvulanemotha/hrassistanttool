@@ -1,5 +1,5 @@
-# Use an official python base Image
-FROM python:3.11-slim
+# Use a fuller Python base image (not slim) to avoid compilation issues
+FROM python:3.11
 
 # Set the working directory
 WORKDIR /app
@@ -7,6 +7,7 @@ WORKDIR /app
 # Install system dependencies, including LibreOffice and build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    python3-dev \
     git \
     tesseract-ocr \
     libtesseract-dev \
@@ -25,11 +26,10 @@ RUN pip install --upgrade pip
 # Copy project dependency files
 COPY pyproject.toml uv.lock* requirements.txt* ./
 
-# Install dependencies using pip (not uv)
-RUN pip install --no-cache-dir -r requirements.txt
-
-# If sqlalchemy-pgvector fails from PyPI, install from GitHub
-# RUN pip install --no-cache-dir git+https://github.com/pgvector/sqlalchemy-pgvector.git
+# Install dependencies using pip
+# Install sqlalchemy-pgvector directly from GitHub to avoid PyPI issues
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir git+https://github.com/pgvector/sqlalchemy-pgvector.git
 
 # Copy your actual Python code
 COPY . .
