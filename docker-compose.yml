@@ -23,7 +23,7 @@ services:
       - hr_ai_assistant
 
   dbb:
-    image: ankane/pgvector:pg15
+    image: ankane/pgvector:v0.5.1
     container_name: hrassistant-db
     restart: always
     environment:
