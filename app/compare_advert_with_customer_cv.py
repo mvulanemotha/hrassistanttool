@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from fastapi.responses import JSONResponse
