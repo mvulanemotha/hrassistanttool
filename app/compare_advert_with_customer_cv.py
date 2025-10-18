@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi import UploadFile , File , HTTPException
 from docx import Document
 from io import BytesIO
-import fitz
+import pymupdf as fitz
 from pathlib import Path
 import tempfile
 import subprocess
