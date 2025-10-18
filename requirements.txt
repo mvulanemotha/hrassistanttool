@@ -40,7 +40,6 @@ weasyprint
 xhtml2pdf 
 fpdf
 PyMuPDF 
-langchain-openai 
 beautifulsoup4  
 python-magic 
 pypdf
