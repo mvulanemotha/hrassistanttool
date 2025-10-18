@@ -23,7 +23,7 @@ services:
       - hr_ai_assistant
 
   dbb:
-    image: postgres:15
+    image: ankane/pgvector:postgres-15 # <-- pgvector-enabled image
     container_name: hrassistant-db
     restart: always
     environment:

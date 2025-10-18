@@ -48,5 +48,5 @@ pyyaml
 rendercv[full]
 alembic
 psycopg2-binary 
-#sqlalchemy-pgvector
-#pgvector
+numpy
+pgvector

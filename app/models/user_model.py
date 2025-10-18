@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from app.database.database import Base
 from pydantic import BaseModel, EmailStr, constr, field_validator
 from typing import List, Optional
+from pgvector.sqlalchemy import Vector
 
 # =============================
 # ✅ SQLAlchemy MODELS
@@ -33,6 +34,18 @@ class User(Base):
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, name={self.name})>"
+
+class CVEmbedding(Base):
+    __tablename__ = "cv_embeddings"
+
+    id = Column(Integer, primary_key=True , index=True)
+    user_id = Column(Integer, ForeignKey("users.id" , ondelete="CASCADE"), nullable=False)
+    job_Title = Column(String , nullable=False)
+    cv_embeddings = Column(Vector(384))
+    
+    create_at = Column(DateTime, default=datetime.utcnow)
+
+
 
 
 class Referals(Base):
