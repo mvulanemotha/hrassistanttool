@@ -51,3 +51,4 @@ rendercv[full]
 alembic
 numpy
 pgvector
+pdf2image

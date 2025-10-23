@@ -35,19 +35,6 @@ class User(Base):
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, name={self.name})>"
 
-class CVEmbedding(Base):
-    __tablename__ = "cv_embeddings"
-
-    id = Column(Integer, primary_key=True , index=True)
-    user_id = Column(Integer, ForeignKey("users.id" , ondelete="CASCADE"), nullable=False)
-    job_Title = Column(String , nullable=False)
-    cv_embeddings = Column(Vector(384))
-    
-    create_at = Column(DateTime, default=datetime.utcnow)
-
-
-
-
 class Referals(Base):
     __tablename__ = "referrals"
 
@@ -130,12 +117,26 @@ class UserCVUpload(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    file_name = Column(String, nullable=False)
     job_title = Column(String, nullable=False)
+    file_name = Column(String , nullable=False)
+    cv_embeddings = Column(Vector(768))  # full CV-level embedding (optional)
     created_at = Column(DateTime, default=datetime.utcnow)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="uploaded_cvs")
+    uploaded_chunks = relationship("UserCVChunk", back_populates="cv_upload", cascade="all, delete")
+    
+class UserCVChunk(Base):
+    __tablename__ = "user_cv_chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cv_id = Column(Integer, ForeignKey("user_cvs.id", ondelete="CASCADE"))
+    chunk_text = Column(String, nullable=False)
+    embedding = Column(Vector(768))  # 384-dimensional vector from the MiniLM model
+    chunk_id = Column(String, nullable=False)  # unique ID for traceability
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+    cv_upload = relationship("UserCVUpload", back_populates="uploaded_chunks")
 
 
 class OTP(Base):

@@ -4,7 +4,8 @@ from langchain_community.vectorstores import FAISS
 
 # === CONFIGURATIONS ===
 VECTOR_DB_PATH = "cv_vectorstore"  # Path to your FAISS vector store
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+#EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
 TOP_K = 20  # retrieve top 20 chunks before grouping
 
 # === Load the vector store ===
@@ -52,6 +53,7 @@ def compare_with_job_description(job_description: str):
         print("-" * 60)
 
     print(f"[INFO] Found {len(best_by_file)} matching CV(s).")
+    
     return best_by_file
 
 

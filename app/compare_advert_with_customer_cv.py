@@ -17,6 +17,7 @@ from openai import OpenAI
 from fastapi.concurrency import run_in_threadpool
 import pytesseract
 from PIL import Image
+from pdf2image import convert_from_path
 
 
 load_dotenv()
@@ -148,6 +149,90 @@ async def extract_uploaded_text(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
 
     return text
+
+async def extract_uploaded_cv(file_bytes: bytes, filename: str):
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"File type {ext} not allowed")
+
+    try:
+        # ✅ ADD DEBUGGING
+        print(f"🔍 Starting extraction for {filename} ({len(file_bytes)} bytes)")
+        
+        if ext == ".pdf":
+            text = extract_pdf(file_bytes)
+        elif ext == ".docx":
+            text = extract_docx(file_bytes)
+        elif ext == ".txt":
+            text = extract_txt(file_bytes)
+        elif ext == ".doc":
+            text = extract_doc(file_bytes)
+        elif ext in [".jpg", ".jpeg", ".png"]:
+            text = extract_text_from_image(file_bytes)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+
+        # ✅ VALIDATE EXTRACTION
+        print(f"📊 Extracted {len(text)} characters from {filename}")
+        
+        if not text or len(text.strip()) < 50:
+            print(f"⚠️ WARNING: Very little text extracted from {filename}")
+            # Try fallback extraction
+            text = await fallback_extraction(file_bytes, filename)
+            
+        if len(text) > 100:
+            print(f"✅ Good extraction: {text[:100]}...")
+        else:
+            print(f"❌ Poor extraction: {text}")
+            
+        return text
+
+    except Exception as e:
+        print(f"❌ Extraction failed for {filename}: {e}")
+        # Try fallback
+        try:
+            text = await fallback_extraction(file_bytes, filename)
+            if text and len(text.strip()) > 50:
+                print(f"✅ Fallback extraction successful: {len(text)} chars")
+                return text
+        except Exception as fallback_error:
+            print(f"❌ Fallback also failed: {fallback_error}")
+        
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
+
+async def fallback_extraction(file_bytes: bytes, filename: str) -> str:
+    """Fallback extraction for problematic files"""
+    try:
+        # For PDFs, try alternative PDF library
+        if filename.lower().endswith('.pdf'):
+            print("🔄 Trying fallback PDF extraction...")
+            try:
+                import PyPDF2
+                from io import BytesIO
+                
+                pdf_file = BytesIO(file_bytes)
+                reader = PyPDF2.PdfReader(pdf_file)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
+                
+                if len(text.strip()) > 50:
+                    return text
+            except Exception as pdf_error:
+                print(f"PyPDF2 fallback failed: {pdf_error}")
+                
+        # For all files, try simple text decoding as last resort
+        try:
+            text = file_bytes.decode('utf-8', errors='ignore')
+            if len(text.strip()) > 50:
+                return text
+        except:
+            pass
+            
+        return ""
+    except Exception as e:
+        print(f"Fallback extraction error: {e}")
+        return ""
 
 # compare text files
 async def compare_documents(job_description_file:UploadFile, cv_file: UploadFile):

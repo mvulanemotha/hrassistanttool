@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH
+from app.embed_files import embed_folder , INPUT_FOLDER ,VECTOR_DB_PATH , uploaded_cv_embed , match_job_advert
 from app.compare_advert_with_customer_cv import compare_texts,compare_documents, CompareRequest , explain_low_score , explain_low_score_in_text
 from app.compare_cvs import compare_with_job_description # importing the function
 from app.database.database import SessionLocal
@@ -32,12 +32,14 @@ from app.generate_cv import CVRequest
 from sqlalchemy.orm import joinedload
 import random
 import string
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 
 CV_STORAGE_DIR = Path("cv_documents")
 USERS_CV_DIR = Path("uploaded_user_cv")
 PROCESSED_CVS = Path("processed_cv")
-
+HR_STORAGE_DIR = Path("hr_users_cvs")
 
 app = FastAPI(
     title="HireAI API",
@@ -210,49 +212,19 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
             "detail": str(e)
         }
 
-
 @app.post("/hrassistantai/upload_cv_embed")
-#call function to upload files
-async def upload_cv_embed(files: list[UploadFile] = File(...) , user_id:str = File(...) , job_title:str = File(...) , db: Session = Depends(get_db)):
+ # call function to upload files
+async def upload_cv_embed(files: list[UploadFile] = File(...), user_id: str = File(...), job_title: str = File(...), db: Session = Depends(get_db)):
     """
     Upload CV files and create a vector store for comparison.
     """
-    print(files)
+    print("We are embedding now")
+    await uploaded_cv_embed(files ,user_id , job_title, db)
 
-    # Create upload folder if it doesn't exist
-    os.makedirs(INPUT_FOLDER, exist_ok=True)
 
-    saved = []
-    # Save uploaded files
-    for file in files:
-        path = os.path.join(INPUT_FOLDER, file.filename)
-        with open(path, "wb") as f:
-            f.write(await file.read())
-        saved.append(file.filename)
 
-        cv_record = UserCVUpload(
-            user_id = user_id,
-            job_title = job_title,
-            file_name = file.filename
-        )
-        db.add(cv_record)
-
-    db.commit()
-
-    #print the saved files
-    print(f"Files saved: {', '.join(saved)}") 
-
-    # Embed the folder and create vector store
-    result = embed_folder(INPUT_FOLDER, VECTOR_DB_PATH)
-    
-    return {
-        "message": "CVs processed successfully.",
-        "summary": result,
-        "saved_files": saved
-    }
-
-@app.get("/hrassistantai/compare_job_description")
 #call function to compare job description with stored CVs
+@app.get("/hrassistantai/compare_job_description")
 def compare_job_description_endpoint(job_description: str , allowed: bool = Depends(check_user_units)):
     """
     Compare a job description with stored CVs and return the best matches.
@@ -272,6 +244,29 @@ def compare_job_description_endpoint(job_description: str , allowed: bool = Depe
         })
 
     return JSONResponse(content={"matches" : output})
+
+#stronger matching of cvs using embeddings
+@app.get("/hrassistantai/match_job_advert")
+async def match_job_adverts(
+    user_id:str,
+    job_title:str,
+    job_description: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Match stored CVs against a job description using AI embeddings
+    """
+    try:
+        print(f"🔍 Matching job advert against CV database...")
+        
+        matches = await match_job_advert(user_id, job_title, job_description,top_k=30,min_score=0.3,db=db)
+
+        return matches
+
+    except Exception as e:
+        print(f"❌ Matching failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Job matching failed: {str(e)}")
+
 
 
 @app.post("/hrassistantai/save_matches" , response_model=MatchHistorySchema)
@@ -340,7 +335,7 @@ def getMatched_cvs(match_id:int , db: Session = Depends(get_db)):
     zip_stream = BytesIO()
     with zipfile.ZipFile(zip_stream , mode="w" , compression=zipfile.ZIP_DEFLATED) as zipf:
         for result in results:
-            file_path = CV_STORAGE_DIR / result.file_name
+            file_path = HR_STORAGE_DIR / result.file_name
             if file_path.exists():
                 # get original file extension
                 ext = Path(result.file_name).suffix
